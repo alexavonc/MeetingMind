@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, type DragEvent } from "react";
 import { Upload, FileAudio, X, ChevronDown } from "lucide-react";
 import type { Folder } from "@/types";
 import type { ProcessingState } from "@/types";
@@ -57,7 +57,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit }: Pro
     setMode("audio");
   }
 
-  function handleDrop(e: React.DragEvent) {
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragOver(false);
     const dropped = e.dataTransfer.files[0];
