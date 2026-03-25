@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import Sidebar from "./components/Sidebar";
@@ -13,7 +14,7 @@ import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
 
-const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
+const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
   { value: "transcript", label: "Transcript", icon: <FileAudio className="w-4 h-4" /> },
   { value: "summary", label: "Summary", icon: <AlignLeft className="w-4 h-4" /> },
   { value: "flowchart", label: "Flowchart", icon: <GitBranch className="w-4 h-4" /> },
