@@ -5,12 +5,13 @@ const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const HF_SINGLISH_URL = "https://api-inference.huggingface.co/models/mjwong/whisper-large-v3-turbo-singlish";
 const SG_PROMPT = "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.";
 
-async function transcribeOpenAICompat(url: string, apiKey: string, file: File, model: string): Promise<string> {
+async function transcribeOpenAICompat(url: string, apiKey: string, file: File, model: string, forceEnglish = false): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   form.append("model", model);
   form.append("response_format", "text");
   form.append("prompt", SG_PROMPT);
+  if (forceEnglish) form.append("language", "en");
 
   const res = await fetch(url, {
     method: "POST",
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
         // HF failed — fall back to Groq if a key is available
         if (apiKey) {
           try {
-            text = await transcribeOpenAICompat(GROQ_URL, apiKey, file, "whisper-large-v3");
+            text = await transcribeOpenAICompat(GROQ_URL, apiKey, file, "whisper-large-v3", true);
           } catch {
             throw hfErr; // both failed, surface the HF error
           }
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     } else {
       // groq (default)
       if (!apiKey) return NextResponse.json({ error: "Missing API key" }, { status: 400 });
-      text = await transcribeOpenAICompat(GROQ_URL, apiKey, file, "whisper-large-v3");
+      text = await transcribeOpenAICompat(GROQ_URL, apiKey, file, "whisper-large-v3", true);
     }
 
     return NextResponse.json({ text });
