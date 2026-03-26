@@ -5,13 +5,15 @@ import { NextRequest, NextResponse } from "next/server";
  *
  * Two modes:
  *
- * 1. Whisper Memos mode (recommended, free transcription):
- *    Send the transcript TEXT that Whisper Memos already produced on-device.
- *    Fields: text, title, folder, secret, claudeKey
+ * 1. Audio file mode (recommended — Voice Memos + Groq):
+ *    Record on Apple Watch with built-in Voice Memos → iOS Shortcut sends the
+ *    m4a file here → Groq whisper-large-v3 transcribes → Claude processes.
+ *    Fields: file, title, folder, secret, provider ("groq" default)
+ *    Server reads GROQ_API_KEY / WHISPER_API_KEY env var automatically.
  *
- * 2. Audio file mode (Just Press Record / any raw audio):
- *    Send the audio file and we transcribe via Groq or OpenAI Whisper.
- *    Fields: file, title, folder, secret, whisperKey, claudeKey, provider
+ * 2. Raw text mode (if you already have a transcript):
+ *    Send transcript text directly, skip transcription entirely.
+ *    Fields: text, title, folder, secret
  *
  * All fields are multipart/form-data.
  * secret must match MEETINGMIND_INGEST_SECRET env var (set in Railway Variables).
@@ -35,17 +37,14 @@ export async function POST(req: NextRequest) {
 
     if (!claudeKey) return NextResponse.json({ error: "Missing claudeKey" }, { status: 400 });
 
-    // Determine raw transcript — text (Whisper Memos) or audio file
+    // Determine raw transcript — audio file (Groq) or pre-existing text
     let rawTranscript: string;
     const text = formData.get("text") as string | null;
     const file = formData.get("file") as File | null;
 
-    if (text?.trim()) {
-      // Mode 1: Whisper Memos already transcribed on-device — free, use directly
-      rawTranscript = text.trim();
-    } else if (file) {
-      // Mode 2: Raw audio — transcribe via Groq/OpenAI
-      const whisperKey = (formData.get("whisperKey") as string) || process.env.WHISPER_API_KEY || "";
+    if (file) {
+      // Mode 1 (primary): audio file → Groq whisper-large-v3
+      const whisperKey = (formData.get("whisperKey") as string) || process.env.GROQ_API_KEY || process.env.WHISPER_API_KEY || "";
       if (!whisperKey) return NextResponse.json({ error: "Missing whisperKey" }, { status: 400 });
 
       const provider = (formData.get("provider") as string) || "groq";
@@ -69,8 +68,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Transcription failed: ${e}` }, { status: 502 });
       }
       rawTranscript = await wRes.text();
+    } else if (text?.trim()) {
+      // Mode 2 (fallback): pre-existing transcript text
+      rawTranscript = text.trim();
     } else {
-      return NextResponse.json({ error: "Provide either 'text' (transcript) or 'file' (audio)" }, { status: 400 });
+      return NextResponse.json({ error: "Provide either 'file' (audio) or 'text' (transcript)" }, { status: 400 });
     }
 
     // Step 2: Diarise via Claude

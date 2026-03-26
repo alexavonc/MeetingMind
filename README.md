@@ -1,8 +1,8 @@
 # MeetingMind
 
-> Apple Watch → Whisper API → Claude API meeting transcript dashboard
+> Apple Watch → Groq Whisper → Claude API meeting transcript dashboard
 
-Record meetings on Apple Watch (Whisper Memos / Just Press Record) → audio transcribed via OpenAI Whisper → structured by Claude into transcripts, summaries, action items, and flowcharts.
+Record meetings on Apple Watch with built-in Voice Memos → iOS Shortcut sends audio to Groq Whisper large-v3 → Claude diarises, summarises, and generates flowcharts.
 
 ## Stack
 
@@ -10,7 +10,7 @@ Record meetings on Apple Watch (Whisper Memos / Just Press Record) → audio tra
 - **Tailwind CSS v4** — dark mode only
 - **Fonts**: Bricolage Grotesque (UI) + JetBrains Mono (code/timestamps)
 - **Mermaid.js** — flowchart rendering
-- **OpenAI Whisper API** — audio transcription
+- **Groq Whisper large-v3** — audio transcription (~3× cheaper than OpenAI)
 - **Anthropic Claude API** (`claude-sonnet-4-20250514`) — diarisation, summaries, flowcharts
 - **localStorage** — persistence (Supabase upgrade path planned)
 
@@ -27,9 +27,23 @@ Open [http://localhost:3000](http://localhost:3000). The app loads with 3 seed m
 
 Go to **Settings** (bottom of sidebar) and enter:
 - **Anthropic Claude key** — `sk-ant-...`
-- **OpenAI Whisper key** — `sk-...`
+- **Groq API key** — `gsk_...` (get one free at console.groq.com)
 
-Keys are stored in `localStorage`. Never share the device's localStorage with others. A future upgrade will move keys server-side.
+Keys are stored in `localStorage`. Never share the device's localStorage with others.
+
+## Apple Watch workflow
+
+1. Record meeting on Apple Watch with **Voice Memos** (built-in, free)
+2. Audio auto-syncs to iPhone
+3. iOS Shortcut sends the m4a to `/api/ingest` → Groq transcribes → Claude processes
+4. Meeting appears in your dashboard
+
+**Railway env vars needed:**
+```
+ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk_...
+MEETINGMIND_INGEST_SECRET=your-generated-secret
+```
 
 ## Features
 
@@ -41,24 +55,22 @@ Keys are stored in `localStorage`. Never share the device's localStorage with ot
 - **Summary view**: AI summary + action items with checkboxes + participants
 - **Flowchart view**: Mermaid.js diagram, regeneratable via Claude
 - **Upload modal**: Drop audio file OR paste raw transcript text
-- **Processing pipeline**: Whisper → Diarise → Summarise → Flowchart → Save
-- **Mobile responsive**: Hamburger menu, FAB button
+- **Record button**: In-browser microphone recording (no local file saved)
+- **Processing pipeline**: Groq Whisper → Claude diarise → Summarise → Flowchart → Save
+- **Mobile responsive**: Hamburger menu, FAB buttons
 
 ## Estimated running costs
 
 | Item | Cost |
 |------|------|
-| Whisper API | ~$0.006/min (~$0.18 for 30 min) |
+| Groq Whisper large-v3 | ~$0.111/hr audio (~$0.06 for 30 min) |
 | Claude API (diarise + summary + flow) | ~$0.02–0.05 |
-| **Per meeting** | **~$0.20–0.25** |
-| 10–15 meetings/month | ~$3–4/month |
+| **Per meeting** | **~$0.08–0.11** |
+| 10–15 meetings/month | ~$1–2/month |
 
 ## Deploy
 
 ```bash
-# Vercel (recommended)
-vercel deploy
-
 # Railway
 railway up
 ```
@@ -66,7 +78,7 @@ railway up
 ## Roadmap
 
 - [ ] Supabase backend (meetings table + auth)
-- [ ] Whisper Memos webhook auto-sync from iPhone
+- [ ] Voice Memos iOS Shortcut auto-sync guide
 - [ ] Export: copy as Markdown, PDF summary
 - [ ] Search across all meetings
 - [ ] Move API keys server-side before sharing with others
