@@ -1,14 +1,14 @@
-/**
- * Transcribes an audio file using OpenAI Whisper API via a server-side route
- * to keep the API key off the client.
- */
+import type { TranscriptionProvider } from "@/types";
+
 export async function transcribeAudio(
   apiKey: string,
-  file: File
+  file: File,
+  provider: TranscriptionProvider = "groq"
 ): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("apiKey", apiKey);
+  formData.append("provider", provider);
 
   const res = await fetch("/api/whisper", {
     method: "POST",
@@ -17,7 +17,7 @@ export async function transcribeAudio(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Whisper API error: ${err}`);
+    throw new Error(`Transcription error: ${err}`);
   }
 
   const data = (await res.json()) as { text: string };
