@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSupabase } from "@/lib/supabase";
 
 /**
  * POST /api/ingest
@@ -133,6 +134,10 @@ SUMMARY: ${summary}`;
       actions,
       flow,
     };
+
+    // Save to Supabase if configured
+    const sb = getServerSupabase();
+    if (sb) await sb.from("meetings").upsert(meeting);
 
     return NextResponse.json({ meeting });
   } catch (err) {
