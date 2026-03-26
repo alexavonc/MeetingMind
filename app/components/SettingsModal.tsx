@@ -70,7 +70,7 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
         </div>
 
         <div className="px-6 py-5 space-y-6">
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400">
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
             API keys are stored locally in your browser. Never share this device&apos;s localStorage with others.
           </div>
 
@@ -108,7 +108,7 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
 
             {provider === "huggingface" ? (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/30 text-xs text-violet-300">
+                <div className="p-3 rounded-lg bg-violet-50 border border-violet-200 text-xs text-violet-700">
                   Uses <code className="text-white/70">mjwong/whisper-large-v3-turbo-singlish</code> — fine-tuned on IMDA National Speech Corpus. Best Singlish accuracy (~13% WER). Falls back to Groq large-v3 automatically if the HF call fails.
                 </div>
 

@@ -33,9 +33,9 @@ export default function ProcessingSteps({ currentStep, error }: Props) {
             <div
               className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
                 isPast
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                  ? "bg-emerald-100 text-emerald-600 border border-emerald-200"
                   : isCurrent
-                  ? "bg-primary/20 text-primary border border-primary/40"
+                  ? "bg-primary/10 text-primary border border-primary/30"
                   : "bg-secondary text-muted-foreground border border-border"
               }`}
             >
@@ -50,7 +50,7 @@ export default function ProcessingSteps({ currentStep, error }: Props) {
             <span
               className={`text-sm ${
                 isPast
-                  ? "text-emerald-400"
+                  ? "text-emerald-600"
                   : isCurrent
                   ? "text-foreground font-medium"
                   : "text-muted-foreground"

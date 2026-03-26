@@ -13,7 +13,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased dark">
+    <html lang="en" className="h-full antialiased">
       <head>
         {/* Fonts loaded via <link> so build doesn't need Google Fonts access */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

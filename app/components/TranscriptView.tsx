@@ -8,10 +8,10 @@ interface Props {
 }
 
 const SPEAKER_COLORS = [
-  "text-blue-400",
-  "text-emerald-400",
-  "text-violet-400",
-  "text-orange-400",
+  "text-blue-600",
+  "text-emerald-600",
+  "text-violet-600",
+  "text-orange-500",
 ];
 
 export default function TranscriptView({ meeting }: Props) {
