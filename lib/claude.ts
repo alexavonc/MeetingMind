@@ -108,9 +108,9 @@ Node types: "start" (opening context), "end" (outcome or next step), "decision" 
 Rules:
 - 6–12 nodes
 - Labels max 5 words each
-- When the content naturally lists multiple items, types, or options (e.g. "three types of issues: A, B, C"), show the parent node branching out to each child — one outgoing edge per item
+- When content enumerates multiple items under a parent (e.g. "three rules: A, B, C"), the parent node must appear as the "source" in SEPARATE edges to each child — NOT a chain (A→B→C). Example: {"source":"rules","target":"ruleA"},{"source":"rules","target":"ruleB"},{"source":"rules","target":"ruleC"}
 - Use "decision" nodes when there is a genuine yes/no or multiple-choice point; label each outgoing edge
-- If the content is genuinely sequential, a linear flow is fine
+- Linear chains are fine when steps are genuinely sequential
 - Multiple "end" nodes are fine if there are distinct outcomes
 
 MEETING: ${meeting.title}
