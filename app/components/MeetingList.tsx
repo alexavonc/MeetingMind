@@ -9,9 +9,9 @@ interface Props {
 }
 
 const LANG_BADGES: Record<Language, { label: string; className: string }> = {
-  en: { label: "EN", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  zh: { label: "ZH", className: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-  sg: { label: "SG", className: "bg-pink-500/20 text-pink-400 border-pink-500/30" },
+  en: { label: "EN", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  zh: { label: "ZH", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  sg: { label: "SG", className: "bg-pink-100 text-pink-700 border-pink-200" },
 };
 
 export default function MeetingList({ meetings, selectedId, onSelect }: Props) {

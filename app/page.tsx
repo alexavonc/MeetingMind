@@ -134,7 +134,7 @@ export default function Home() {
               type="button"
               onClick={() => setRecordOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30 transition-colors"
+                bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors"
             >
               <Mic className="w-4 h-4" />
               Record

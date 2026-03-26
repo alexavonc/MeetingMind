@@ -1,8 +1,90 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  BackgroundVariant,
+  Handle,
+  Position,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+  type NodeTypes,
+} from "@xyflow/react";
+import Dagre from "@dagrejs/dagre";
 import { RefreshCw } from "lucide-react";
 import type { Meeting } from "@/types";
+
+interface RawNode { id: string; label: string; type?: string }
+interface RawEdge { source: string; target: string; label?: string; id?: string }
+interface FlowData { nodes: RawNode[]; edges: RawEdge[] }
+
+function parseFlow(flow: string): FlowData | null {
+  try {
+    const data = JSON.parse(flow) as FlowData;
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } {
+  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "TB", ranksep: 55, nodesep: 35 });
+
+  raw.nodes.forEach((n) => g.setNode(n.id, { width: 170, height: 48 }));
+  raw.edges.forEach((e) => g.setEdge(e.source, e.target));
+  Dagre.layout(g);
+
+  const nodes: Node[] = raw.nodes.map((n) => {
+    const pos = g.node(n.id);
+    return {
+      id: n.id,
+      type: "flowNode",
+      position: { x: pos.x - 85, y: pos.y - 24 },
+      data: { label: n.label, nodeType: n.type ?? "step" },
+    };
+  });
+
+  const edges: Edge[] = raw.edges.map((e, i) => ({
+    id: e.id ?? `e-${i}`,
+    source: e.source,
+    target: e.target,
+    label: e.label,
+    type: "smoothstep",
+    style: { stroke: "hsl(258 89% 62% / 0.55)", strokeWidth: 1.5 },
+    labelStyle: { fontSize: 10, fill: "#888" },
+    labelBgStyle: { fill: "white", fillOpacity: 0.8 },
+  }));
+
+  return { nodes, edges };
+}
+
+function FlowNode({ data }: { data: { label: string; nodeType?: string } }) {
+  const { nodeType = "step" } = data;
+  const cls =
+    nodeType === "start"
+      ? "bg-violet-100 border-violet-300 text-violet-700"
+      : nodeType === "end"
+      ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+      : nodeType === "decision"
+      ? "bg-amber-100 border-amber-300 text-amber-700"
+      : "bg-white border-gray-200 text-gray-700";
+
+  return (
+    <div className={`px-3 py-2.5 rounded-lg border text-[11px] font-medium text-center w-[170px] leading-snug shadow-sm ${cls}`}>
+      <Handle type="target" position={Position.Top} style={{ background: "#d1d5db", width: 6, height: 6, border: "none" }} />
+      {data.label}
+      <Handle type="source" position={Position.Bottom} style={{ background: "#d1d5db", width: 6, height: 6, border: "none" }} />
+    </div>
+  );
+}
+
+const NODE_TYPES: NodeTypes = { flowNode: FlowNode };
 
 interface Props {
   meeting: Meeting;
@@ -11,56 +93,20 @@ interface Props {
 }
 
 export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rendered, setRendered] = useState(false);
 
-  useEffect(() => {
-    if (!meeting.flow || !containerRef.current) return;
+  const flowData = useMemo(() => parseFlow(meeting.flow ?? ""), [meeting.flow]);
 
-    let cancelled = false;
-    setRendered(false);
-    setError(null);
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+    () => (flowData ? buildLayoutedElements(flowData) : { nodes: [], edges: [] }),
+    [flowData]
+  );
 
-    async function render() {
-      try {
-        const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: "dark",
-          themeVariables: {
-            darkMode: true,
-            background: "transparent",
-            primaryColor: "#1e40af",
-            primaryTextColor: "#e2e8f0",
-            primaryBorderColor: "#3b82f6",
-            lineColor: "#64748b",
-            secondaryColor: "#1e293b",
-            tertiaryColor: "#0f172a",
-          },
-        });
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-        const id = `mermaid-${meeting.id}`;
-        const { svg } = await mermaid.render(id, meeting.flow);
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg;
-          setRendered(true);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Render error");
-        }
-      }
-    }
-
-    render();
-    return () => {
-      cancelled = true;
-    };
-  }, [meeting.flow, meeting.id]);
-
-  async function handleRegenerate() {
+  const handleRegenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -70,14 +116,14 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
     } finally {
       setLoading(false);
     }
-  }
+  }, [onRegenerate]);
+
+  const isOldFormat = !flowData && meeting.flow && meeting.flow.trim().startsWith("flowchart");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Auto-generated from meeting content
-        </p>
+        <p className="text-xs text-muted-foreground">Auto-generated from meeting content</p>
         {hasApiKey && (
           <button
             type="button"
@@ -94,22 +140,43 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-destructive/20 border border-destructive/40 text-sm text-destructive-foreground">
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {meeting.flow ? (
-        <div
-          ref={containerRef}
-          className="mermaid-container w-full overflow-x-auto rounded-xl bg-secondary/30 p-4 min-h-48"
-          aria-label="Meeting flowchart"
-        />
-      ) : (
-        <div className="flex items-center justify-center h-48 rounded-xl bg-secondary/30 text-muted-foreground text-sm">
-          No flowchart generated yet
-          {hasApiKey && " — click Regenerate to create one"}
+      {isOldFormat && (
+        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
+          This flowchart uses the old format. Click Regenerate to update.
         </div>
+      )}
+
+      {flowData && nodes.length > 0 ? (
+        <div className="w-full rounded-xl border border-border overflow-hidden" style={{ height: 460 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={NODE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
+            panOnDrag
+            zoomOnScroll
+          >
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </div>
+      ) : (
+        !isOldFormat && (
+          <div className="flex items-center justify-center h-48 rounded-xl bg-secondary/60 text-muted-foreground text-sm border border-border">
+            No flowchart yet{hasApiKey ? " — click Regenerate to create one" : ""}
+          </div>
+        )
       )}
     </div>
   );

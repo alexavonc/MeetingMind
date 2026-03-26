@@ -26,7 +26,7 @@ export default function ParsedText({ text, className }: ParsedTextProps) {
             return (
               <span
                 key={i}
-                className="text-amber-300 italic"
+                className="text-amber-600 italic"
                 title="Translated from Mandarin"
               >
                 {token.english}
@@ -34,7 +34,7 @@ export default function ParsedText({ text, className }: ParsedTextProps) {
             );
           case "sg":
             return (
-              <span key={i} className="text-pink-400 font-medium" title="Singlish">
+              <span key={i} className="text-pink-600 font-medium" title="Singlish">
                 {token.value}
               </span>
             );

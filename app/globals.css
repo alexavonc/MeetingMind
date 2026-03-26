@@ -1,26 +1,28 @@
+@import "@xyflow/react/dist/style.css";
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 14%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 22%;
-    --input: 217 33% 22%;
-    --ring: 217 91% 60%;
+    /* Adora-inspired light mode */
+    --background: 220 20% 96%;
+    --foreground: 222 47% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 8%;
+    --primary: 258 89% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 16% 93%;
+    --secondary-foreground: 222 47% 8%;
+    --muted: 220 16% 93%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 258 89% 96%;
+    --accent-foreground: 258 89% 38%;
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 16% 88%;
+    --input: 220 16% 92%;
+    --ring: 258 89% 62%;
     --radius: 0.5rem;
   }
 }
@@ -52,9 +54,35 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Mermaid dark theme override */
-.mermaid-container svg {
-  background: transparent !important;
+/* React Flow light theme overrides */
+.react-flow__background {
+  background-color: hsl(var(--card));
+}
+.react-flow__controls {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  fill: hsl(var(--muted-foreground));
+}
+.react-flow__controls-button:hover {
+  background: hsl(var(--secondary));
+}
+.react-flow__edge-path {
+  stroke: hsl(var(--primary));
+  stroke-opacity: 0.6;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-opacity: 1;
+}
+.react-flow__edge-label {
+  font-size: 11px;
+  fill: hsl(var(--muted-foreground));
 }
 
 /* Custom scrollbar */
@@ -70,5 +98,5 @@ body {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: hsl(var(--muted-foreground) / 0.5);
 }

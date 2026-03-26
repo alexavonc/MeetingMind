@@ -99,14 +99,17 @@ export async function genFlow(
     .map((u) => `${meeting.speakers[u.s] ?? u.s}: ${u.text}`)
     .join("\n");
 
-  const prompt = `Generate a Mermaid.js flowchart for this meeting. Return ONLY the mermaid code — no backticks, no markdown fences, no explanation.
+  const prompt = `Generate a flowchart for this meeting as JSON. Return ONLY valid JSON — no backticks, no markdown, no explanation.
 
+Format:
+{"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
+
+Node types: "start" (opening node), "end" (final outcomes/next steps), "decision" (yes/no branch point), "step" (default)
 Rules:
-- Use flowchart TD
-- Short node labels (max 5 words each)
-- Use emojis for visual interest
-- Show discussion flow and decision points
-- End with next steps / action items
+- 6–10 nodes maximum
+- Labels max 5 words each
+- Show key discussion points, decisions, and outcomes in flow order
+- Last node should be "end" type summarising next steps
 
 MEETING: ${meeting.title}
 SUMMARY: ${meeting.summary}
@@ -114,6 +117,7 @@ DISCUSSION EXCERPT:
 ${excerpts}`;
 
   const raw = await callClaude(apiKey, prompt, 1024);
-  // Strip any accidental backtick fences
-  return raw.replace(/^```(?:mermaid)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  JSON.parse(cleaned); // validate — throws if Claude returned garbage
+  return cleaned;
 }

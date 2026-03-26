@@ -119,7 +119,7 @@ export default function RecordModal({ open, onClose, processing, onSubmit }: Pro
                       style={{
                         height: `${Math.max(4, level * 44)}px`,
                         background: state === "recording"
-                          ? `hsl(${217 + level * 20} 91% ${50 + level * 15}%)`
+                          ? `hsl(${258 + level * 10} 89% ${55 + level * 15}%)`
                           : "hsl(var(--border))",
                       }}
                     />
@@ -137,7 +137,7 @@ export default function RecordModal({ open, onClose, processing, onSubmit }: Pro
                     <span className="ml-2 inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                   )}
                   {state === "stopped" && (
-                    <p className="text-xs text-emerald-400 mt-1">Recording complete</p>
+                    <p className="text-xs text-emerald-600 mt-1">Recording complete</p>
                   )}
                 </div>
 
