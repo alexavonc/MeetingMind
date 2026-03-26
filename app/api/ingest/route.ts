@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       wForm.append("file", file);
       wForm.append("model", model);
       wForm.append("response_format", "text");
-      wForm.append("language", "en");
+      wForm.append("prompt", "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.");
       const wRes = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${whisperKey}` },
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     const diarisePrompt = `Diarise this transcript. Return ONLY valid JSON (no backticks):
 {"speakers":{"A":"name"},"transcript":[{"s":"A","t":"0:00","text":"cleaned"}]}
 Rules:
-- Wrap Mandarin in [zh|English translation|原文中文][/zh]
+- Translate any Mandarin/Chinese spoken words to English. Wrap in [zh|English translation][/zh]
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
 TRANSCRIPT: ${rawTranscript}`;

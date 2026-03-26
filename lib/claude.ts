@@ -36,7 +36,7 @@ export async function diarise(
 {"speakers":{"A":"name"},"transcript":[{"s":"A","t":"0:00","text":"cleaned"}]}
 
 Rules:
-- Wrap Mandarin phrases in [zh|English translation|原文中文][/zh]
+- Translate any Mandarin/Chinese spoken words into English. Wrap the translation in [zh|English translation][/zh]
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
 - Keep timestamps as MM:SS
