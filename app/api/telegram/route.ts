@@ -54,7 +54,9 @@ async function transcribe(
     wav: "audio/wav",
     webm: "audio/webm",
   };
-  const file = new File([buffer], `rec.${ext}`, {
+  // Groq doesn't accept .oga — normalise to .ogg (same codec)
+  const safeExt = ext === "oga" ? "ogg" : ext;
+  const file = new File([buffer], `rec.${safeExt}`, {
     type: mime[ext] ?? "audio/ogg",
   });
   const form = new FormData();
