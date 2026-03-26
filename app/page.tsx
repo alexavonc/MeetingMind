@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import Sidebar from "./components/Sidebar";
 import TranscriptView from "./components/TranscriptView";
@@ -10,6 +10,7 @@ import SummaryView from "./components/SummaryView";
 import FlowchartView from "./components/FlowchartView";
 import UploadModal from "./components/UploadModal";
 import SettingsModal from "./components/SettingsModal";
+import RecordModal from "./components/RecordModal";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
@@ -40,6 +41,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
 
   function handleSelectMeeting(id: string) {
     setSelectedId(id);
@@ -127,15 +129,26 @@ export default function Home() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setUploadOpen(true)}
-            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-              bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New
-          </button>
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRecordOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30 transition-colors"
+            >
+              <Mic className="w-4 h-4" />
+              Record
+            </button>
+            <button
+              type="button"
+              onClick={() => setUploadOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Upload
+            </button>
+          </div>
         </header>
 
         {selectedMeeting ? (
@@ -205,17 +218,27 @@ export default function Home() {
         )}
       </main>
 
-      {/* Mobile FAB */}
-      <button
-        type="button"
-        onClick={() => setUploadOpen(true)}
-        className="md:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full
-          bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 transition-colors
-          flex items-center justify-center"
-        aria-label="New meeting"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {/* Mobile FABs */}
+      <div className="md:hidden fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3">
+        <button
+          type="button"
+          onClick={() => setRecordOpen(true)}
+          className="w-12 h-12 rounded-full bg-red-500 text-white shadow-xl hover:bg-red-400
+            transition-colors flex items-center justify-center"
+          aria-label="Record meeting"
+        >
+          <Mic className="w-5 h-5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setUploadOpen(true)}
+          className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl
+            hover:bg-primary/90 transition-colors flex items-center justify-center"
+          aria-label="Upload meeting"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
 
       <UploadModal
         open={uploadOpen}
@@ -229,6 +252,13 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSave={updateSettings}
+      />
+
+      <RecordModal
+        open={recordOpen}
+        onClose={() => setRecordOpen(false)}
+        processing={processing}
+        onSubmit={handleProcessUpload}
       />
     </div>
   );

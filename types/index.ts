@@ -28,9 +28,13 @@ export interface Meeting {
   flow: string;       // raw mermaid syntax
 }
 
+export type TranscriptionProvider = "openai" | "groq";
+
 export interface Settings {
   claudeKey: string;
   whisperKey: string;
+  transcriptionProvider: TranscriptionProvider;
+  ingestSecret: string; // token for the /api/ingest Watch → webhook endpoint
 }
 
 export type ProcessingStep =
