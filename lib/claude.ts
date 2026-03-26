@@ -104,12 +104,14 @@ export async function genFlow(
 Format:
 {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
 
-Node types: "start" (opening node), "end" (final outcomes/next steps), "decision" (yes/no branch point), "step" (default)
+Node types: "start" (opening context), "end" (outcome or next step), "decision" (branch point), "step" (default)
 Rules:
-- 6–10 nodes maximum
+- 6–12 nodes
 - Labels max 5 words each
-- Show key discussion points, decisions, and outcomes in flow order
-- Last node should be "end" type summarising next steps
+- When the content naturally lists multiple items, types, or options (e.g. "three types of issues: A, B, C"), show the parent node branching out to each child — one outgoing edge per item
+- Use "decision" nodes when there is a genuine yes/no or multiple-choice point; label each outgoing edge
+- If the content is genuinely sequential, a linear flow is fine
+- Multiple "end" nodes are fine if there are distinct outcomes
 
 MEETING: ${meeting.title}
 SUMMARY: ${meeting.summary}

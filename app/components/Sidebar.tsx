@@ -17,6 +17,8 @@ interface Props {
   onSelectFolder: (f: Folder) => void;
   onSelectMeeting: (id: string) => void;
   onOpenSettings: () => void;
+  onMoveMeeting: (id: string, folder: Folder) => void;
+  onDeleteMeeting: (id: string) => void;
 }
 
 export default function Sidebar({
@@ -26,6 +28,8 @@ export default function Sidebar({
   onSelectFolder,
   onSelectMeeting,
   onOpenSettings,
+  onMoveMeeting,
+  onDeleteMeeting,
 }: Props) {
   const folderMeetings = meetings.filter((m) => m.folder === selectedFolder);
 
@@ -78,6 +82,9 @@ export default function Sidebar({
           meetings={folderMeetings}
           selectedId={selectedId}
           onSelect={onSelectMeeting}
+          onMove={onMoveMeeting}
+          onDelete={onDeleteMeeting}
+          currentFolder={selectedFolder}
         />
       </div>
 

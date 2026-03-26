@@ -217,7 +217,29 @@ TRANSCRIPT: ${transcriptText}`;
       actions: { text: string; owner: string }[];
     };
 
-    // 5. Save to Supabase
+    // 5. Generate flowchart
+    let flow = "";
+    try {
+      const excerpts = transcript
+        .slice(0, 20)
+        .map((u) => `${speakers[u.s] ?? u.s}: ${u.text}`)
+        .join("\n");
+      const flowPrompt = `Generate a flowchart for this meeting as JSON. Return ONLY valid JSON — no backticks, no markdown, no explanation.
+Format: {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
+Node types: "start","end","decision","step"
+Rules: 6-12 nodes, labels max 5 words. When content lists multiple items/types/options, branch the parent node to each child. Use decision nodes for genuine yes/no or multi-choice points with labelled edges. Linear flow is fine when content is sequential.
+MEETING: Voice memo
+SUMMARY: ${summary}
+DISCUSSION: ${excerpts}`;
+      const flowRaw = await callClaude(anthropicKey, flowPrompt, 1024);
+      const flowCleaned = flowRaw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+      JSON.parse(flowCleaned); // validate
+      flow = flowCleaned;
+    } catch {
+      // Non-critical — meeting saved without flowchart
+    }
+
+    // 6. Save to Supabase
     const allText = transcript.map((u) => u.text).join(" ");
     const languages = [
       "en",
@@ -235,7 +257,7 @@ TRANSCRIPT: ${transcriptText}`;
       transcript,
       summary,
       actions,
-      flow: "",
+      flow,
     };
     const sb = getServerSupabase();
     if (sb) await sb.from("meetings").upsert(meeting);
