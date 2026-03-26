@@ -34,7 +34,7 @@ function parseFlow(flow: string): FlowData | null {
 
 function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 55, nodesep: 35 });
+  g.setGraph({ rankdir: "TB", ranksep: 60, nodesep: 50 });
 
   raw.nodes.forEach((n) => g.setNode(n.id, { width: 170, height: 48 }));
   raw.edges.forEach((e) => g.setEdge(e.source, e.target));
