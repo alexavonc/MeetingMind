@@ -3,67 +3,75 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/ingest
  *
- * Receives an audio file from the Apple Shortcut (or any HTTP client),
- * transcribes it via Groq/OpenAI Whisper, diarises + summarises via Claude,
- * and returns the processed meeting object.
+ * Two modes:
  *
- * Expected multipart/form-data fields:
- *   file         — audio file (m4a, mp3, wav, webm, mp4)
- *   title        — meeting title (optional, defaults to date/time)
- *   folder       — "govtech" | "flow-three" | "personal" (optional, defaults to "personal")
- *   secret       — must match MEETINGMIND_INGEST_SECRET env var
- *   whisperKey   — Groq or OpenAI key (if not using server-side env var)
- *   claudeKey    — Anthropic key (if not using server-side env var)
- *   provider     — "groq" | "openai" (optional, defaults to "groq")
+ * 1. Whisper Memos mode (recommended, free transcription):
+ *    Send the transcript TEXT that Whisper Memos already produced on-device.
+ *    Fields: text, title, folder, secret, claudeKey
+ *
+ * 2. Audio file mode (Just Press Record / any raw audio):
+ *    Send the audio file and we transcribe via Groq or OpenAI Whisper.
+ *    Fields: file, title, folder, secret, whisperKey, claudeKey, provider
+ *
+ * All fields are multipart/form-data.
+ * secret must match MEETINGMIND_INGEST_SECRET env var (set in Railway Variables).
  */
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    // Auth — check secret token
+    // Auth
     const secret = formData.get("secret") as string | null;
     const envSecret = process.env.MEETINGMIND_INGEST_SECRET;
     if (envSecret && secret !== envSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const file = formData.get("file") as File | null;
-    if (!file) {
-      return NextResponse.json({ error: "Missing audio file" }, { status: 400 });
-    }
-
-    const whisperKey = (formData.get("whisperKey") as string) || process.env.WHISPER_API_KEY || "";
     const claudeKey = (formData.get("claudeKey") as string) || process.env.ANTHROPIC_API_KEY || "";
-    const provider = (formData.get("provider") as string) || "groq";
     const title =
       (formData.get("title") as string) ||
       `Meeting ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
     const folder = (formData.get("folder") as string) || "personal";
 
-    if (!whisperKey) return NextResponse.json({ error: "Missing whisperKey" }, { status: 400 });
     if (!claudeKey) return NextResponse.json({ error: "Missing claudeKey" }, { status: 400 });
 
-    // Step 1: Transcribe
-    const whisperProviders = {
-      groq: { url: "https://api.groq.com/openai/v1/audio/transcriptions", model: "whisper-large-v3" },
-      openai: { url: "https://api.openai.com/v1/audio/transcriptions", model: "whisper-1" },
-    };
-    const { url, model } = whisperProviders[provider as keyof typeof whisperProviders] ?? whisperProviders.groq;
+    // Determine raw transcript — text (Whisper Memos) or audio file
+    let rawTranscript: string;
+    const text = formData.get("text") as string | null;
+    const file = formData.get("file") as File | null;
 
-    const wForm = new FormData();
-    wForm.append("file", file);
-    wForm.append("model", model);
-    wForm.append("response_format", "text");
-    const wRes = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${whisperKey}` },
-      body: wForm,
-    });
-    if (!wRes.ok) {
-      const e = await wRes.text();
-      return NextResponse.json({ error: `Transcription failed: ${e}` }, { status: 502 });
+    if (text?.trim()) {
+      // Mode 1: Whisper Memos already transcribed on-device — free, use directly
+      rawTranscript = text.trim();
+    } else if (file) {
+      // Mode 2: Raw audio — transcribe via Groq/OpenAI
+      const whisperKey = (formData.get("whisperKey") as string) || process.env.WHISPER_API_KEY || "";
+      if (!whisperKey) return NextResponse.json({ error: "Missing whisperKey" }, { status: 400 });
+
+      const provider = (formData.get("provider") as string) || "groq";
+      const whisperProviders = {
+        groq: { url: "https://api.groq.com/openai/v1/audio/transcriptions", model: "whisper-large-v3" },
+        openai: { url: "https://api.openai.com/v1/audio/transcriptions", model: "whisper-1" },
+      };
+      const { url, model } = whisperProviders[provider as keyof typeof whisperProviders] ?? whisperProviders.groq;
+
+      const wForm = new FormData();
+      wForm.append("file", file);
+      wForm.append("model", model);
+      wForm.append("response_format", "text");
+      const wRes = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${whisperKey}` },
+        body: wForm,
+      });
+      if (!wRes.ok) {
+        const e = await wRes.text();
+        return NextResponse.json({ error: `Transcription failed: ${e}` }, { status: 502 });
+      }
+      rawTranscript = await wRes.text();
+    } else {
+      return NextResponse.json({ error: "Provide either 'text' (transcript) or 'file' (audio)" }, { status: 400 });
     }
-    const rawTranscript = await wRes.text();
 
     // Step 2: Diarise via Claude
     const diarisePrompt = `Diarise this transcript. Return ONLY valid JSON (no backticks):

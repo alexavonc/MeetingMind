@@ -113,7 +113,7 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-0.5">Apple Watch auto-ingest</p>
               <p className="text-xs text-muted-foreground/70">
-                Use this endpoint + secret in your iOS Shortcut to auto-process recordings from Just Press Record or Voice Memos.
+                Use with an iOS Shortcut + Whisper Memos for free on-device transcription. Whisper Memos transcribes on your Watch/iPhone — the Shortcut sends the text here for diarisation + summary.
               </p>
             </div>
 
