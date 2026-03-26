@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       wForm.append("file", file);
       wForm.append("model", model);
       wForm.append("response_format", "text");
-      wForm.append("language", "en");
+      wForm.append("prompt", "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.");
       const wRes = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${whisperKey}` },

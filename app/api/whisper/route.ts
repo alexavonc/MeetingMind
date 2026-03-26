@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     outForm.append("file", file);
     outForm.append("model", model);
     outForm.append("response_format", "text");
-    outForm.append("language", "en");
+    outForm.append("prompt", "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.");
 
     const res = await fetch(url, {
       method: "POST",
