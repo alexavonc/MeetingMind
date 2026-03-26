@@ -108,9 +108,9 @@ Node types: "start" (opening context), "end" (outcome or next step), "decision" 
 Rules:
 - 6–12 nodes
 - Labels max 5 words each
-- CRITICAL: The chart MUST branch. A single node may have 2–3 outgoing edges to parallel topics or options. Avoid any purely linear chain of more than 3 nodes.
-- Use "decision" nodes where options or choices arise; label each outgoing edge with the branch name (e.g. "approved", "rejected", "option A")
-- Parallel streams of work can converge to a shared "end" node
+- When the content naturally lists multiple items, types, or options (e.g. "three types of issues: A, B, C"), show the parent node branching out to each child — one outgoing edge per item
+- Use "decision" nodes when there is a genuine yes/no or multiple-choice point; label each outgoing edge
+- If the content is genuinely sequential, a linear flow is fine
 - Multiple "end" nodes are fine if there are distinct outcomes
 
 MEETING: ${meeting.title}

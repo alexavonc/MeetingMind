@@ -227,7 +227,7 @@ TRANSCRIPT: ${transcriptText}`;
       const flowPrompt = `Generate a flowchart for this meeting as JSON. Return ONLY valid JSON — no backticks, no markdown, no explanation.
 Format: {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
 Node types: "start","end","decision","step"
-Rules: 6-12 nodes, labels max 5 words, MUST branch (a node may have 2-3 outgoing edges to parallel topics), use decision nodes for choices with labelled edges, avoid purely linear chains.
+Rules: 6-12 nodes, labels max 5 words. When content lists multiple items/types/options, branch the parent node to each child. Use decision nodes for genuine yes/no or multi-choice points with labelled edges. Linear flow is fine when content is sequential.
 MEETING: Voice memo
 SUMMARY: ${summary}
 DISCUSSION: ${excerpts}`;
