@@ -37,6 +37,16 @@ export async function diarise(
 
 Rules:
 - Translate any Mandarin/Chinese spoken words into English. Wrap the translation in [zh|English translation][/zh]
+- The speech recogniser often phonetically transcribes Mandarin/Hokkien words as English-sounding text. Identify and translate these too. Common examples:
+  - "lai liao" / "lie there" / "lai lah" → [zh|come already][/zh]
+  - "kuai dian" / "kuai teng" / "Kuai Teng" → [zh|faster / hurry up][/zh]
+  - "mai lah" / "mai" → [zh|don't want][/zh]
+  - "ho seh" / "ho say" → [zh|great / well done][/zh]
+  - "sian" / "xian" (when expressing boredom) → [zh|bored / fed up][/zh]
+  - "bo liao" → [zh|nothing better to do][/zh]
+  - "aiyah" / "ai yah" → [zh|expression of exasperation][/zh]
+  - "wah lau" / "walao" → [zh|expression of disbelief][/zh]
+  - Any pinyin-like syllables (e.g. "ni", "wo", "ta", "men", "de", "shi", "bu") in unusual context
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
 - Keep timestamps as MM:SS
