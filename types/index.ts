@@ -28,13 +28,15 @@ export interface Meeting {
   flow: string;       // raw mermaid syntax
 }
 
-export type TranscriptionProvider = "openai" | "groq";
+export type TranscriptionProvider = "openai" | "groq" | "huggingface";
 
 export interface Settings {
   claudeKey: string;
-  whisperKey: string;
+  whisperKey: string; // Groq or OpenAI key (also used as Groq fallback when HF is primary)
   transcriptionProvider: TranscriptionProvider;
   ingestSecret: string; // token for the /api/ingest Watch → webhook endpoint
+  hfToken: string;      // HuggingFace API token
+  hfEndpointUrl: string; // HF Inference Endpoint URL (blank = use serverless API)
 }
 
 export type ProcessingStep =

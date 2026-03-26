@@ -9,7 +9,7 @@ import { transcribeAudio } from "@/lib/whisper";
 
 export function useMeetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [settings, setSettings] = useState<Settings>({ claudeKey: "", whisperKey: "", transcriptionProvider: "groq", ingestSecret: "" });
+  const [settings, setSettings] = useState<Settings>({ claudeKey: "", whisperKey: "", transcriptionProvider: "groq", ingestSecret: "", hfToken: "", hfEndpointUrl: "" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<Folder>("govtech");
   const [processing, setProcessing] = useState<ProcessingState>({
@@ -92,8 +92,9 @@ export function useMeetings() {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
         } else {
-          if (!settings.whisperKey) throw new Error("Transcription API key not set");
-          raw = await transcribeAudio(settings.whisperKey, input, settings.transcriptionProvider);
+          if (settings.transcriptionProvider === "huggingface" && !settings.hfToken) throw new Error("HuggingFace token not set");
+          if (settings.transcriptionProvider !== "huggingface" && !settings.whisperKey) throw new Error("Transcription API key not set");
+          raw = await transcribeAudio(settings.whisperKey, input, settings.transcriptionProvider, settings.hfToken ?? "", settings.hfEndpointUrl ?? "");
           setProcessing({ active: true, step: "diarising", error: null });
         }
 
