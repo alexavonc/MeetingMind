@@ -113,7 +113,7 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-0.5">Apple Watch auto-ingest</p>
               <p className="text-xs text-muted-foreground/70">
-                Use with an iOS Shortcut + Whisper Memos for free on-device transcription. Whisper Memos transcribes on your Watch/iPhone — the Shortcut sends the text here for diarisation + summary.
+                Record on Apple Watch with Voice Memos → iOS Shortcut sends the audio file here → Groq transcribes → Claude processes. Set <code className="text-foreground/60">GROQ_API_KEY</code> in Railway Variables.
               </p>
             </div>
 
@@ -157,7 +157,7 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
                 </button>
               </div>
               <p className="text-xs text-muted-foreground/70 mt-1">
-                Set <code className="text-foreground/60">MEETINGMIND_INGEST_SECRET</code> to this value in Railway Variables.
+                Set <code className="text-foreground/60">MEETINGMIND_INGEST_SECRET</code> and <code className="text-foreground/60">GROQ_API_KEY</code> in Railway Variables.
               </p>
             </div>
           </div>
