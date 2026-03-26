@@ -3,12 +3,16 @@ import type { TranscriptionProvider } from "@/types";
 export async function transcribeAudio(
   apiKey: string,
   file: File,
-  provider: TranscriptionProvider = "groq"
+  provider: TranscriptionProvider = "groq",
+  hfToken = "",
+  hfEndpointUrl = ""
 ): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("apiKey", apiKey);
   formData.append("provider", provider);
+  if (hfToken) formData.append("hfToken", hfToken);
+  if (hfEndpointUrl) formData.append("hfEndpointUrl", hfEndpointUrl);
 
   const res = await fetch("/api/whisper", {
     method: "POST",

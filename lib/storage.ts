@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: Settings = {
   whisperKey: "",
   transcriptionProvider: "groq",
   ingestSecret: "",
+  hfToken: "",
+  hfEndpointUrl: "",
 };
 
 export function loadSettings(): Settings {

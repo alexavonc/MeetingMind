@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
 {"speakers":{"A":"name"},"transcript":[{"s":"A","t":"0:00","text":"cleaned"}]}
 Rules:
 - Translate any Mandarin/Chinese spoken words to English. Wrap in [zh|English translation][/zh]
+- The speech recogniser often phonetically transcribes Mandarin/Hokkien words as English-sounding text. Identify and translate these too. Common examples: "lai liao"/"lie there" → [zh|come already][/zh], "kuai dian"/"kuai teng"/"Kuai Teng" → [zh|faster][/zh], "mai lah" → [zh|don't want][/zh], "ho seh" → [zh|great][/zh], "bo liao" → [zh|nothing better to do][/zh]. Also look for pinyin-like syllables (ni, wo, ta, men, de, shi, bu) used in unusual English context.
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
 TRANSCRIPT: ${rawTranscript}`;
