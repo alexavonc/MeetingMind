@@ -104,12 +104,14 @@ export async function genFlow(
 Format:
 {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
 
-Node types: "start" (opening node), "end" (final outcomes/next steps), "decision" (yes/no branch point), "step" (default)
+Node types: "start" (opening context), "end" (outcome or next step), "decision" (branch point), "step" (default)
 Rules:
-- 6–10 nodes maximum
+- 6–12 nodes
 - Labels max 5 words each
-- Show key discussion points, decisions, and outcomes in flow order
-- Last node should be "end" type summarising next steps
+- CRITICAL: The chart MUST branch. A single node may have 2–3 outgoing edges to parallel topics or options. Avoid any purely linear chain of more than 3 nodes.
+- Use "decision" nodes where options or choices arise; label each outgoing edge with the branch name (e.g. "approved", "rejected", "option A")
+- Parallel streams of work can converge to a shared "end" node
+- Multiple "end" nodes are fine if there are distinct outcomes
 
 MEETING: ${meeting.title}
 SUMMARY: ${meeting.summary}

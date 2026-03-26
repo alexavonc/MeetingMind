@@ -39,6 +39,12 @@ async function dbUpdate(id: string, patch: Partial<Meeting>) {
   await sb.from("meetings").update(patch).eq("id", id);
 }
 
+async function dbDelete(id: string) {
+  const sb = getSupabase();
+  if (!sb) return;
+  await sb.from("meetings").delete().eq("id", id);
+}
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useMeetings() {
@@ -110,6 +116,25 @@ export function useMeetings() {
       saveDB(updated);
       return updated;
     });
+  }, []);
+
+  const moveMeeting = useCallback((id: string, folder: Folder) => {
+    setMeetings((prev) => {
+      const updated = prev.map((m) => m.id === id ? { ...m, folder } : m);
+      saveDB(updated);
+      return updated;
+    });
+    dbUpdate(id, { folder });
+  }, []);
+
+  const deleteMeeting = useCallback((id: string) => {
+    setMeetings((prev) => {
+      const updated = prev.filter((m) => m.id !== id);
+      saveDB(updated);
+      return updated;
+    });
+    setSelectedId((prev) => prev === id ? null : prev);
+    dbDelete(id);
   }, []);
 
   const regenerateFlow = useCallback(async (meetingId: string) => {
@@ -215,6 +240,8 @@ export function useMeetings() {
     updateSettings,
     processing,
     toggleAction,
+    moveMeeting,
+    deleteMeeting,
     regenerateFlow,
     processUpload,
   };

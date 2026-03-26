@@ -33,6 +33,8 @@ export default function Home() {
     updateSettings,
     processing,
     toggleAction,
+    moveMeeting,
+    deleteMeeting,
     regenerateFlow,
     processUpload,
   } = useMeetings();
@@ -69,6 +71,8 @@ export default function Home() {
           onSelectFolder={setSelectedFolder}
           onSelectMeeting={handleSelectMeeting}
           onOpenSettings={() => setSettingsOpen(true)}
+          onMoveMeeting={moveMeeting}
+          onDeleteMeeting={deleteMeeting}
         />
       </aside>
 
@@ -97,6 +101,8 @@ export default function Home() {
               onSelectFolder={setSelectedFolder}
               onSelectMeeting={handleSelectMeeting}
               onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
+              onMoveMeeting={moveMeeting}
+              onDeleteMeeting={deleteMeeting}
             />
           </aside>
         </div>
