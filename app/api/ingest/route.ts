@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       wForm.append("file", file);
       wForm.append("model", model);
       wForm.append("response_format", "text");
+      wForm.append("language", "en");
       const wRes = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${whisperKey}` },

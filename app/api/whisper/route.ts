@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     outForm.append("file", file);
     outForm.append("model", model);
     outForm.append("response_format", "text");
+    outForm.append("language", "en");
 
     const res = await fetch(url, {
       method: "POST",
