@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSupabase } from "@/lib/supabase";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
@@ -214,7 +215,30 @@ TRANSCRIPT: ${transcriptText}`;
       actions: { text: string; owner: string }[];
     };
 
-    // 5. Format reply
+    // 5. Save to Supabase
+    const allText = transcript.map((u) => u.text).join(" ");
+    const languages = [
+      "en",
+      ...(/\[zh\|/.test(allText) ? ["zh"] : []),
+      ...(/\[sg\]/.test(allText) ? ["sg"] : []),
+    ];
+    const meeting = {
+      id: `tg-${Date.now()}`,
+      title: `Voice memo ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
+      folder: "personal",
+      date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      duration: `${Math.ceil(transcript.length * 0.5)} min`,
+      languages,
+      speakers,
+      transcript,
+      summary,
+      actions,
+      flow: "",
+    };
+    const sb = getServerSupabase();
+    if (sb) await sb.from("meetings").upsert(meeting);
+
+    // 6. Format reply
     const speakerNames = Object.values(speakers).join(", ");
     const actionLines =
       actions.length > 0
