@@ -100,7 +100,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit }: Pro
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {processing.active || processing.step === "done" ? (
+          {processing.active ? (
             <ProcessingSteps currentStep={processing.step} error={processing.error} detail={processing.detail} />
           ) : (
             <>
