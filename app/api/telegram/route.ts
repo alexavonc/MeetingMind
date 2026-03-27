@@ -24,9 +24,14 @@ async function downloadTgFile(
   const r = await fetch(
     `https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`
   );
-  const { result } = (await r.json()) as {
-    result: { file_path: string; file_size?: number };
+  const json = (await r.json()) as {
+    ok: boolean;
+    result?: { file_path: string; file_size?: number };
   };
+  if (!json.ok || !json.result) {
+    throw new Error("File too large to download — Telegram bot API limit is 20 MB. Please trim the recording or split it.");
+  }
+  const { result } = json;
   if ((result.file_size ?? 0) > 20 * 1024 * 1024) {
     throw new Error("File too large — Telegram limit is 20 MB via bot API");
   }
