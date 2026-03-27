@@ -52,7 +52,7 @@ export default function Home() {
   }
 
   async function handleProcessUpload(
-    input: File | string,
+    input: File | File[] | string,
     title: string,
     folder: Folder
   ) {

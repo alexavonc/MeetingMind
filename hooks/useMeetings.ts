@@ -157,7 +157,7 @@ export function useMeetings() {
   }, [meetings, settings.claudeKey]);
 
   const processUpload = useCallback(
-    async (input: File | string, title: string, folder: Folder) => {
+    async (input: File | File[] | string, title: string, folder: Folder) => {
       if (!settings.claudeKey) throw new Error("Claude API key not set");
       setProcessing({ active: true, step: "transcribing", error: null });
 
@@ -171,10 +171,24 @@ export function useMeetings() {
             throw new Error("HuggingFace token not set");
           if (settings.transcriptionProvider !== "huggingface" && !settings.whisperKey)
             throw new Error("Transcription API key not set");
-          raw = await transcribeAudio(
-            settings.whisperKey, input, settings.transcriptionProvider,
-            settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
-          );
+
+          const fileList = Array.isArray(input) ? input : [input];
+          const parts: string[] = [];
+          for (let i = 0; i < fileList.length; i++) {
+            setProcessing({
+              active: true, step: "transcribing", error: null,
+              detail: fileList.length > 1 ? `Part ${i + 1} of ${fileList.length}` : undefined,
+            });
+            const part = await transcribeAudio(
+              settings.whisperKey, fileList[i], settings.transcriptionProvider,
+              settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
+            );
+            parts.push(part);
+          }
+          raw = parts.length === 1
+            ? parts[0]
+            : parts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
+
           setProcessing({ active: true, step: "diarising", error: null });
         }
 

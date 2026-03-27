@@ -52,6 +52,7 @@ export interface ProcessingState {
   active: boolean;
   step: ProcessingStep | null;
   error: string | null;
+  detail?: string; // e.g. "Part 2 of 3"
 }
 
 // Parsed token types for markup rendering
