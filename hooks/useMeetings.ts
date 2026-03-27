@@ -308,10 +308,11 @@ export function useMeetings() {
   };
 }
 
-function detectLanguages(transcript: { text: string }[]): ("en" | "zh" | "sg")[] {
+function detectLanguages(transcript: { text: string }[]): ("en" | "zh" | "sg" | "ms")[] {
   const all = transcript.map((u) => u.text).join(" ");
-  const langs: ("en" | "zh" | "sg")[] = ["en"];
+  const langs: ("en" | "zh" | "sg" | "ms")[] = ["en"];
   if (/\[zh\|/.test(all)) langs.push("zh");
+  if (/\[ms\|/.test(all)) langs.push("ms");
   if (/\[sg\]/.test(all)) langs.push("sg");
   return langs;
 }

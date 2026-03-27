@@ -37,6 +37,17 @@ export async function diarise(
 
 Rules:
 - Translate any Mandarin/Chinese spoken words into English. Wrap the translation in [zh|English translation][/zh]
+- Translate any Malay words or phrases into English. Wrap in [ms|English translation][/ms]. Common Malay words used by Singapore speakers:
+  - "contohnya" → [ms|for example][/ms]
+  - "boleh" → [ms|can][/ms]
+  - "sudah" / "dah" → [ms|already][/ms]
+  - "tak" / "tidak" → [ms|not][/ms]
+  - "dengan" → [ms|with][/ms]
+  - "kalau" → [ms|if][/ms]
+  - "memang" → [ms|indeed][/ms]
+  - "macam" → [ms|like / as if][/ms]
+  - "sekarang" → [ms|now][/ms]
+  - Full Malay sentences should be translated in full and wrapped in [ms|English translation][/ms]
 - The speech recogniser often phonetically transcribes Mandarin/Hokkien words as English-sounding text. Identify and translate these too. Common examples:
   - "lai liao" / "lie there" / "lai lah" → [zh|come already][/zh]
   - "kuai dian" / "kuai teng" / "Kuai Teng" → [zh|faster / hurry up][/zh]
