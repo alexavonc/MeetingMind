@@ -12,6 +12,7 @@ import UploadModal from "./components/UploadModal";
 import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
 import ExportButton from "./components/ExportButton";
+import AudioPlayer from "./components/AudioPlayer";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
@@ -34,6 +35,7 @@ export default function Home() {
     updateSettings,
     processing,
     toggleAction,
+    renameMeeting,
     moveMeeting,
     deleteMeeting,
     regenerateFlow,
@@ -74,6 +76,7 @@ export default function Home() {
           onOpenSettings={() => setSettingsOpen(true)}
           onMoveMeeting={moveMeeting}
           onDeleteMeeting={deleteMeeting}
+          onRenameMeeting={renameMeeting}
         />
       </aside>
 
@@ -104,6 +107,7 @@ export default function Home() {
               onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
               onMoveMeeting={moveMeeting}
               onDeleteMeeting={deleteMeeting}
+              onRenameMeeting={renameMeeting}
             />
           </aside>
         </div>
@@ -161,6 +165,11 @@ export default function Home() {
 
         {selectedMeeting ? (
           <>
+            {/* Audio player — shown when recording is attached */}
+            {selectedMeeting.audiourl && (
+              <AudioPlayer url={selectedMeeting.audiourl} />
+            )}
+
             {/* Tab bar */}
             <div className="flex border-b border-border px-4 flex-shrink-0">
               {TABS.map((tab) => (

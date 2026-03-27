@@ -244,7 +244,29 @@ DISCUSSION: ${excerpts}`;
       // Non-critical — meeting saved without flowchart
     }
 
-    // 6. Save to Supabase
+    // 6. Upload audio to Supabase Storage (best-effort)
+    const meetingId = `tg-${Date.now()}`;
+    let audioUrl: string | undefined;
+    const mimeMap: Record<string, string> = {
+      ogg: "audio/ogg", oga: "audio/ogg", mp3: "audio/mpeg",
+      m4a: "audio/m4a", mp4: "audio/mp4", wav: "audio/wav", webm: "audio/webm",
+    };
+    try {
+      const sb2 = getServerSupabase();
+      if (sb2) {
+        const storageExt = ext === "oga" ? "ogg" : ext;
+        const storagePath = `${meetingId}/${Date.now()}.${storageExt}`;
+        const { error: uploadErr } = await sb2.storage
+          .from("recordings")
+          .upload(storagePath, buffer, { contentType: mimeMap[ext] ?? "audio/ogg", upsert: true });
+        if (!uploadErr) {
+          const { data: urlData } = sb2.storage.from("recordings").getPublicUrl(storagePath);
+          audioUrl = urlData.publicUrl;
+        }
+      }
+    } catch { /* non-critical */ }
+
+    // 7. Save to Supabase
     const allText = transcript.map((u) => u.text).join(" ");
     const languages = [
       "en",
@@ -252,7 +274,7 @@ DISCUSSION: ${excerpts}`;
       ...(/\[sg\]/.test(allText) ? ["sg"] : []),
     ];
     const meeting = {
-      id: `tg-${Date.now()}`,
+      id: meetingId,
       title: `Voice memo ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
       folder: "personal",
       date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
@@ -263,6 +285,7 @@ DISCUSSION: ${excerpts}`;
       summary,
       actions,
       flow,
+      ...(audioUrl ? { audiourl: audioUrl } : {}),
     };
     const sb = getServerSupabase();
     if (sb) await sb.from("meetings").upsert(meeting);

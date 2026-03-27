@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Trash2, FolderInput } from "lucide-react";
+import { MoreVertical, Trash2, FolderInput, Pencil } from "lucide-react";
 import type { Meeting, Language, Folder } from "@/types";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   onSelect: (id: string) => void;
   onMove: (id: string, folder: Folder) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   currentFolder: Folder;
 }
 
@@ -30,11 +31,13 @@ function MeetingMenu({
   currentFolder,
   onMove,
   onDelete,
+  onRename,
 }: {
   meeting: Meeting;
   currentFolder: Folder;
   onMove: (folder: Folder) => void;
   onDelete: () => void;
+  onRename: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [showMove, setShowMove] = useState(false);
@@ -67,6 +70,14 @@ function MeetingMenu({
         <div className="absolute right-0 top-7 z-50 w-44 bg-card border border-border rounded-lg shadow-lg py-1 text-sm">
           {!showMove ? (
             <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setOpen(false); onRename(); }}
+                className="flex items-center gap-2 w-full px-3 py-2 hover:bg-secondary text-foreground transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                Rename
+              </button>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowMove(true); }}
@@ -115,7 +126,22 @@ function MeetingMenu({
   );
 }
 
-export default function MeetingList({ meetings, selectedId, onSelect, onMove, onDelete, currentFolder }: Props) {
+export default function MeetingList({ meetings, selectedId, onSelect, onMove, onDelete, onRename, currentFolder }: Props) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  function startRename(meeting: Meeting) {
+    setRenamingId(meeting.id);
+    setRenameValue(meeting.title);
+    setTimeout(() => renameRef.current?.select(), 30);
+  }
+
+  function commitRename(id: string) {
+    if (renameValue.trim()) onRename(id, renameValue.trim());
+    setRenamingId(null);
+  }
+
   if (meetings.length === 0) {
     return (
       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -131,7 +157,7 @@ export default function MeetingList({ meetings, selectedId, onSelect, onMove, on
         <li key={meeting.id} className="group">
           <button
             type="button"
-            onClick={() => onSelect(meeting.id)}
+            onClick={() => renamingId !== meeting.id && onSelect(meeting.id)}
             className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
               selectedId === meeting.id
                 ? "bg-primary/15 border border-primary/30"
@@ -139,11 +165,28 @@ export default function MeetingList({ meetings, selectedId, onSelect, onMove, on
             }`}
           >
             <div className="flex items-start justify-between gap-1">
-              <p className={`text-sm font-medium leading-snug flex-1 ${
-                selectedId === meeting.id ? "text-foreground" : "text-foreground/80"
-              }`}>
-                {meeting.title}
-              </p>
+              {renamingId === meeting.id ? (
+                <input
+                  ref={renameRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={() => commitRename(meeting.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitRename(meeting.id); }
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-sm font-medium bg-card border border-primary/50 rounded px-1.5 py-0.5
+                    focus:outline-none focus:ring-1 focus:ring-primary text-foreground min-w-0"
+                  autoFocus
+                />
+              ) : (
+                <p className={`text-sm font-medium leading-snug flex-1 ${
+                  selectedId === meeting.id ? "text-foreground" : "text-foreground/80"
+                }`}>
+                  {meeting.title}
+                </p>
+              )}
               <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                 {meeting.languages.map((lang) => (
                   <span
@@ -158,6 +201,7 @@ export default function MeetingList({ meetings, selectedId, onSelect, onMove, on
                   currentFolder={currentFolder}
                   onMove={(folder) => onMove(meeting.id, folder)}
                   onDelete={() => onDelete(meeting.id)}
+                  onRename={() => startRename(meeting)}
                 />
               </div>
             </div>

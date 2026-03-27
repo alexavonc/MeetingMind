@@ -118,6 +118,16 @@ export function useMeetings() {
     });
   }, []);
 
+  const renameMeeting = useCallback((id: string, title: string) => {
+    if (!title.trim()) return;
+    setMeetings((prev) => {
+      const updated = prev.map((m) => m.id === id ? { ...m, title: title.trim() } : m);
+      saveDB(updated);
+      return updated;
+    });
+    dbUpdate(id, { title: title.trim() });
+  }, []);
+
   const moveMeeting = useCallback((id: string, folder: Folder) => {
     setMeetings((prev) => {
       const updated = prev.map((m) => m.id === id ? { ...m, folder } : m);
@@ -200,8 +210,10 @@ export function useMeetings() {
         );
         setProcessing({ active: true, step: "flowcharting", error: null });
 
+        const meetingId = `meeting-${Date.now()}`;
+
         const tmpMeeting = {
-          id: "", title, folder, date: "", duration: "",
+          id: meetingId, title, folder, date: "", duration: "",
           languages: [] as Meeting["languages"],
           speakers: diarised.speakers, transcript: diarised.transcript,
           summary, actions, flow: "",
@@ -210,15 +222,33 @@ export function useMeetings() {
         const flow = await genFlow(settings.claudeKey, tmpMeeting);
         setProcessing({ active: true, step: "saving", error: null });
 
+        // Upload audio to Supabase Storage (single file only, best-effort)
+        let audioUrl: string | undefined;
+        if (typeof input !== "string") {
+          const fileList = Array.isArray(input) ? input : [input];
+          if (fileList.length === 1) {
+            try {
+              const form = new FormData();
+              form.append("file", fileList[0]);
+              form.append("meetingId", meetingId);
+              const res = await fetch("/api/store-audio", { method: "POST", body: form });
+              if (res.ok) {
+                const { url } = (await res.json()) as { url: string };
+                audioUrl = url;
+              }
+            } catch { /* non-critical */ }
+          }
+        }
+
         const newMeeting: Meeting = {
           ...tmpMeeting,
-          id: `meeting-${Date.now()}`,
           date: new Date().toLocaleDateString("en-GB", {
             day: "numeric", month: "short", year: "numeric",
           }),
           duration: `${Math.ceil(diarised.transcript.length * 0.5)} min`,
           languages: detectLanguages(diarised.transcript),
           flow,
+          ...(audioUrl ? { audiourl: audioUrl } : {}),
         };
 
         setMeetings((prev) => {
@@ -254,6 +284,7 @@ export function useMeetings() {
     updateSettings,
     processing,
     toggleAction,
+    renameMeeting,
     moveMeeting,
     deleteMeeting,
     regenerateFlow,
