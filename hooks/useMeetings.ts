@@ -118,6 +118,83 @@ export function useMeetings() {
     });
   }, []);
 
+  const reprocessMeeting = useCallback(async (meetingId: string, newFile?: File) => {
+    const meeting = meetings.find((m) => m.id === meetingId);
+    if (!meeting) return;
+    if (!settings.claudeKey) throw new Error("Claude API key not set");
+    if (settings.transcriptionProvider !== "huggingface" && !settings.whisperKey)
+      throw new Error("Transcription API key not set");
+
+    setProcessing({ active: true, step: "transcribing", error: null });
+
+    try {
+      // Resolve audio file — new upload or fetch existing URL
+      let audioFile: File;
+      let audiourl = meeting.audiourl;
+
+      if (newFile) {
+        // Upload the new file first so it's saved even if processing fails later
+        setProcessing({ active: true, step: "saving", error: null });
+        try {
+          const form = new FormData();
+          form.append("file", newFile);
+          form.append("meetingId", meetingId);
+          const res = await fetch("/api/store-audio", { method: "POST", body: form });
+          if (res.ok) {
+            const { url } = (await res.json()) as { url: string };
+            audiourl = url;
+          }
+        } catch { /* non-critical */ }
+        audioFile = newFile;
+        setProcessing({ active: true, step: "transcribing", error: null });
+      } else if (meeting.audiourl) {
+        const res = await fetch(meeting.audiourl);
+        const blob = await res.blob();
+        const ext = meeting.audiourl.split(".").pop() ?? "ogg";
+        audioFile = new File([blob], `recording.${ext}`, { type: blob.type || "audio/ogg" });
+      } else {
+        throw new Error("No audio attached — upload a file first");
+      }
+
+      const raw = await transcribeAudio(
+        settings.whisperKey, audioFile, settings.transcriptionProvider,
+        settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
+      );
+
+      setProcessing({ active: true, step: "diarising", error: null });
+      const diarised = await diarise(settings.claudeKey, raw);
+
+      setProcessing({ active: true, step: "summarising", error: null });
+      const { summary, actions } = await summarise(settings.claudeKey, diarised.transcript, diarised.speakers);
+
+      setProcessing({ active: true, step: "flowcharting", error: null });
+      const flow = await genFlow(settings.claudeKey, { ...meeting, speakers: diarised.speakers, transcript: diarised.transcript, summary });
+
+      setProcessing({ active: true, step: "saving", error: null });
+      const patch: Partial<Meeting> = {
+        speakers: diarised.speakers,
+        transcript: diarised.transcript,
+        summary,
+        actions,
+        flow,
+        languages: detectLanguages(diarised.transcript),
+        ...(audiourl ? { audiourl } : {}),
+      };
+
+      setMeetings((prev) => {
+        const updated = prev.map((m) => m.id === meetingId ? { ...m, ...patch } : m);
+        saveDB(updated);
+        return updated;
+      });
+      await dbUpdate(meetingId, patch);
+      setProcessing({ active: false, step: "done", error: null });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setProcessing({ active: false, step: "error", error: msg });
+      throw err;
+    }
+  }, [meetings, settings]);
+
   const attachAudio = useCallback(async (meetingId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -299,6 +376,7 @@ export function useMeetings() {
     updateSettings,
     processing,
     toggleAction,
+    reprocessMeeting,
     attachAudio,
     renameMeeting,
     moveMeeting,
@@ -308,10 +386,11 @@ export function useMeetings() {
   };
 }
 
-function detectLanguages(transcript: { text: string }[]): ("en" | "zh" | "sg")[] {
+function detectLanguages(transcript: { text: string }[]): ("en" | "zh" | "sg" | "ms")[] {
   const all = transcript.map((u) => u.text).join(" ");
-  const langs: ("en" | "zh" | "sg")[] = ["en"];
+  const langs: ("en" | "zh" | "sg" | "ms")[] = ["en"];
   if (/\[zh\|/.test(all)) langs.push("zh");
+  if (/\[ms\|/.test(all)) langs.push("ms");
   if (/\[sg\]/.test(all)) langs.push("sg");
   return langs;
 }

@@ -7,6 +7,7 @@ import type { Meeting } from "@/types";
 function clean(text: string) {
   return text
     .replace(/\[zh\|([^\]]+)\]\[\/zh\]/g, "$1")
+    .replace(/\[ms\|([^\]]+)\]\[\/ms\]/g, "$1")
     .replace(/\[sg\]([\s\S]*?)\[\/sg\]/g, "$1");
 }
 

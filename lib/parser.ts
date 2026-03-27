@@ -1,16 +1,11 @@
 import type { Token } from "@/types";
 
 /**
- * Parses utterance text containing [zh|english][/zh] and [sg]text[/sg] markup.
- *
- * [zh|...][/zh] — Mandarin translated to English by Claude. Optionally may
- * still contain a legacy pipe-separated Chinese field which is ignored.
- * [sg]...[/sg]  — Singlish slang, rendered in pink.
+ * Parses utterance text containing [zh|english][/zh], [ms|english][/ms], and [sg]text[/sg] markup.
  */
 export function parseMarkup(input: string): Token[] {
   const tokens: Token[] = [];
-  // Matches [zh|english][/zh], [zh|english|chinese][/zh] (legacy), or [sg]...[/sg]
-  const pattern = /\[zh\|([^|\]]+)(?:\|[^\]]+)?\]\[\/zh\]|\[sg\]([\s\S]*?)\[\/sg\]/g;
+  const pattern = /\[zh\|([^|\]]+)(?:\|[^\]]+)?\]\[\/zh\]|\[ms\|([^\]]+)\]\[\/ms\]|\[sg\]([\s\S]*?)\[\/sg\]/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -20,10 +15,11 @@ export function parseMarkup(input: string): Token[] {
     }
 
     if (match[1] !== undefined) {
-      // zh token — only english translation, chinese field ignored
       tokens.push({ type: "zh", english: match[1], chinese: "" });
     } else if (match[2] !== undefined) {
-      tokens.push({ type: "sg", value: match[2] });
+      tokens.push({ type: "ms", english: match[2] });
+    } else if (match[3] !== undefined) {
+      tokens.push({ type: "sg", value: match[3] });
     }
 
     lastIndex = match.index + match[0].length;

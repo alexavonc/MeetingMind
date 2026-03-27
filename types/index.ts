@@ -1,4 +1,4 @@
-export type Language = "en" | "zh" | "sg";
+export type Language = "en" | "zh" | "sg" | "ms";
 
 export interface Utterance {
   s: string; // speaker key e.g. "A"
@@ -60,4 +60,5 @@ export interface ProcessingState {
 export type Token =
   | { type: "text"; value: string }
   | { type: "zh"; english: string; chinese: string }
-  | { type: "sg"; value: string };
+  | { type: "sg"; value: string }
+  | { type: "ms"; english: string };

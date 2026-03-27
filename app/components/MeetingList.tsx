@@ -17,6 +17,7 @@ interface Props {
 const LANG_BADGES: Record<Language, { label: string; className: string }> = {
   en: { label: "EN", className: "bg-blue-100 text-blue-700 border-blue-200" },
   zh: { label: "ZH", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  ms: { label: "MS", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   sg: { label: "SG", className: "bg-pink-100 text-pink-700 border-pink-200" },
 };
 

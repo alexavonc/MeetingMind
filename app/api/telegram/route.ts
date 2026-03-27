@@ -196,6 +196,7 @@ export async function POST(req: NextRequest) {
 Rules:
 - Translate any Mandarin/Chinese spoken words to English. Wrap in [zh|English translation][/zh]
 - Phonetically transcribed Mandarin/Hokkien: "lai liao"/"lie there" → [zh|come already][/zh], "kuai teng" → [zh|faster][/zh], "mai lah" → [zh|don't want][/zh], "ho seh" → [zh|great][/zh]
+- Translate any Malay words or phrases to English. Wrap in [ms|English translation][/ms]. e.g. "contohnya" → [ms|for example][/ms], "boleh" → [ms|can][/ms], "sudah"/"dah" → [ms|already][/ms], full Malay sentences translated fully
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
 TRANSCRIPT: ${rawTranscript}`;
@@ -271,6 +272,7 @@ DISCUSSION: ${excerpts}`;
     const languages = [
       "en",
       ...(/\[zh\|/.test(allText) ? ["zh"] : []),
+      ...(/\[ms\|/.test(allText) ? ["ms"] : []),
       ...(/\[sg\]/.test(allText) ? ["sg"] : []),
     ];
     const meeting = {

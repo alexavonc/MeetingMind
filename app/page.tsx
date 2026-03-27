@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import type { ReactNode } from "react";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import Sidebar from "./components/Sidebar";
 import TranscriptView from "./components/TranscriptView";
@@ -13,34 +13,62 @@ import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
 import ExportButton from "./components/ExportButton";
 import AudioPlayer from "./components/AudioPlayer";
+import ProcessingSteps from "./components/ProcessingSteps";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
 
-function AttachAudioBar({ onAttach }: { onAttach: (f: File) => Promise<void> }) {
+function AudioBar({
+  audioUrl,
+  onAttach,
+  onReplace,
+  onReprocess,
+}: {
+  audioUrl?: string;
+  onAttach: (f: File) => Promise<void>;
+  onReplace: (f: File) => void;
+  onReprocess: () => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const replaceRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleFile(file: File) {
-    setUploading(true);
-    setError(null);
+  async function handleAttach(file: File) {
+    setUploading(true); setError(null);
     try { await onAttach(file); }
-    catch { setError("Upload failed — is the recordings bucket created in Supabase?"); }
+    catch { setError("Upload failed — is the 'recordings' bucket created in Supabase?"); }
     finally { setUploading(false); }
+  }
+
+  if (audioUrl) {
+    return (
+      <div className="flex flex-col border-b border-border">
+        <AudioPlayer url={audioUrl} />
+        <input ref={replaceRef} type="file" accept="audio/*,.m4a,.mp3,.wav,.mp4" className="hidden"
+          onChange={(e) => e.target.files?.[0] && onReplace(e.target.files[0])} />
+        <div className="flex items-center gap-4 px-4 py-1.5 bg-secondary/20">
+          <button type="button" onClick={onReprocess}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="w-3 h-3" />
+            Re-process
+          </button>
+          <button type="button" onClick={() => replaceRef.current?.click()}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <UploadIcon className="w-3 h-3" />
+            Replace audio
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 border-b border-border">
       <input ref={inputRef} type="file" accept="audio/*,.m4a,.mp3,.wav,.mp4" className="hidden"
-        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground
-          transition-colors disabled:opacity-50"
-      >
+        onChange={(e) => e.target.files?.[0] && handleAttach(e.target.files[0])} />
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
         <Paperclip className="w-3.5 h-3.5" />
         {uploading ? "Uploading…" : "Attach audio recording"}
       </button>
@@ -67,6 +95,7 @@ export default function Home() {
     updateSettings,
     processing,
     toggleAction,
+    reprocessMeeting,
     attachAudio,
     renameMeeting,
     moveMeeting,
@@ -198,12 +227,13 @@ export default function Home() {
 
         {selectedMeeting ? (
           <>
-            {/* Audio — player if attached, attach button otherwise */}
-            {selectedMeeting.audiourl ? (
-              <AudioPlayer url={selectedMeeting.audiourl} />
-            ) : (
-              <AttachAudioBar onAttach={(file) => attachAudio(selectedMeeting.id, file)} />
-            )}
+            {/* Audio bar */}
+            <AudioBar
+              audioUrl={selectedMeeting.audiourl}
+              onAttach={(file) => attachAudio(selectedMeeting.id, file)}
+              onReplace={(file) => reprocessMeeting(selectedMeeting.id, file)}
+              onReprocess={() => reprocessMeeting(selectedMeeting.id)}
+            />
 
             {/* Tab bar */}
             <div className="flex border-b border-border px-4 flex-shrink-0">
@@ -224,18 +254,20 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Tab content */}
+            {/* Tab content — replaced by progress UI while reprocessing */}
             <div className="flex-1 overflow-y-auto px-4 py-5">
-              {activeTab === "transcript" && (
+              {processing.active ? (
+                <div className="max-w-sm mx-auto mt-8">
+                  <ProcessingSteps currentStep={processing.step} error={processing.error} detail={processing.detail} />
+                </div>
+              ) : activeTab === "transcript" ? (
                 <TranscriptView meeting={selectedMeeting} />
-              )}
-              {activeTab === "summary" && (
+              ) : activeTab === "summary" ? (
                 <SummaryView
                   meeting={selectedMeeting}
                   onToggleAction={(idx) => toggleAction(selectedMeeting.id, idx)}
                 />
-              )}
-              {activeTab === "flowchart" && (
+              ) : (
                 <FlowchartView
                   meeting={selectedMeeting}
                   onRegenerate={() => regenerateFlow(selectedMeeting.id)}

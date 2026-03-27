@@ -32,6 +32,12 @@ export default function ParsedText({ text, className }: ParsedTextProps) {
                 {token.english}
               </span>
             );
+          case "ms":
+            return (
+              <span key={i} className="text-emerald-700 italic" title="Translated from Malay">
+                {token.english}
+              </span>
+            );
           case "sg":
             return (
               <span key={i} className="text-pink-600 font-medium" title="Singlish">
