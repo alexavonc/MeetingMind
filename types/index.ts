@@ -25,7 +25,8 @@ export interface Meeting {
   transcript: Utterance[];
   summary: string;
   actions: Action[];
-  flow: string;       // raw mermaid syntax
+  flow: string;
+  audiourl?: string;  // Supabase Storage public URL (column name lowercase to match Supabase convention)
 }
 
 export type TranscriptionProvider = "openai" | "groq" | "huggingface";
@@ -52,6 +53,7 @@ export interface ProcessingState {
   active: boolean;
   step: ProcessingStep | null;
   error: string | null;
+  detail?: string; // e.g. "Part 2 of 3"
 }
 
 // Parsed token types for markup rendering

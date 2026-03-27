@@ -16,9 +16,10 @@ const ORDER = STEPS.map((s) => s.key);
 interface Props {
   currentStep: ProcessingStep | null;
   error: string | null;
+  detail?: string;
 }
 
-export default function ProcessingSteps({ currentStep, error }: Props) {
+export default function ProcessingSteps({ currentStep, error, detail }: Props) {
   const currentIdx = currentStep ? ORDER.indexOf(currentStep) : -1;
 
   return (
@@ -57,6 +58,9 @@ export default function ProcessingSteps({ currentStep, error }: Props) {
               }`}
             >
               {step.label}
+              {isCurrent && detail && (
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">({detail})</span>
+              )}
             </span>
           </div>
         );
