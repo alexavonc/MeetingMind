@@ -11,6 +11,7 @@ import FlowchartView from "./components/FlowchartView";
 import UploadModal from "./components/UploadModal";
 import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
+import ExportButton from "./components/ExportButton";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
@@ -136,6 +137,7 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
+            {selectedMeeting && <ExportButton meeting={selectedMeeting} />}
             <button
               type="button"
               onClick={() => setRecordOpen(true)}
