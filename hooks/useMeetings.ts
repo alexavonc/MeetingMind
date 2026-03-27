@@ -118,6 +118,21 @@ export function useMeetings() {
     });
   }, []);
 
+  const attachAudio = useCallback(async (meetingId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("meetingId", meetingId);
+    const res = await fetch("/api/store-audio", { method: "POST", body: form });
+    if (!res.ok) throw new Error("Audio upload failed");
+    const { url } = (await res.json()) as { url: string };
+    setMeetings((prev) => {
+      const updated = prev.map((m) => m.id === meetingId ? { ...m, audiourl: url } : m);
+      saveDB(updated);
+      return updated;
+    });
+    dbUpdate(meetingId, { audiourl: url });
+  }, []);
+
   const renameMeeting = useCallback((id: string, title: string) => {
     if (!title.trim()) return;
     setMeetings((prev) => {
@@ -284,6 +299,7 @@ export function useMeetings() {
     updateSettings,
     processing,
     toggleAction,
+    attachAudio,
     renameMeeting,
     moveMeeting,
     deleteMeeting,

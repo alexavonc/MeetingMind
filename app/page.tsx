@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { ReactNode } from "react";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import Sidebar from "./components/Sidebar";
 import TranscriptView from "./components/TranscriptView";
@@ -16,6 +16,38 @@ import AudioPlayer from "./components/AudioPlayer";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
+
+function AttachAudioBar({ onAttach }: { onAttach: (f: File) => Promise<void> }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    setError(null);
+    try { await onAttach(file); }
+    catch { setError("Upload failed — is the recordings bucket created in Supabase?"); }
+    finally { setUploading(false); }
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 border-b border-border">
+      <input ref={inputRef} type="file" accept="audio/*,.m4a,.mp3,.wav,.mp4" className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground
+          transition-colors disabled:opacity-50"
+      >
+        <Paperclip className="w-3.5 h-3.5" />
+        {uploading ? "Uploading…" : "Attach audio recording"}
+      </button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </div>
+  );
+}
 
 const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
   { value: "transcript", label: "Transcript", icon: <FileAudio className="w-4 h-4" /> },
@@ -35,6 +67,7 @@ export default function Home() {
     updateSettings,
     processing,
     toggleAction,
+    attachAudio,
     renameMeeting,
     moveMeeting,
     deleteMeeting,
@@ -165,9 +198,11 @@ export default function Home() {
 
         {selectedMeeting ? (
           <>
-            {/* Audio player — shown when recording is attached */}
-            {selectedMeeting.audiourl && (
+            {/* Audio — player if attached, attach button otherwise */}
+            {selectedMeeting.audiourl ? (
               <AudioPlayer url={selectedMeeting.audiourl} />
+            ) : (
+              <AttachAudioBar onAttach={(file) => attachAudio(selectedMeeting.id, file)} />
             )}
 
             {/* Tab bar */}
