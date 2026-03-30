@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -18,6 +18,7 @@ import Dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
 import type { Meeting } from "@/types";
 import ParsedText from "@/app/components/ParsedText";
+import { getSupabase } from "@/lib/supabase";
 
 // ── Flowchart helpers (same as FlowchartView) ─────────────────────────────────
 
@@ -116,6 +117,67 @@ function FlowChart({ flow }: { flow: string }) {
   );
 }
 
+// ── Save banner ───────────────────────────────────────────────────────────────
+
+function SaveBanner({ meeting }: { meeting: Meeting }) {
+  const [state, setState] = useState<"checking" | "save" | "saving" | "saved" | "hidden">("checking");
+
+  useEffect(() => {
+    async function check() {
+      const sb = getSupabase();
+      if (!sb) { setState("hidden"); return; }
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { setState("hidden"); return; }
+
+      // Check if this meeting is already saved for this user
+      const { data } = await sb.from("meetings").select("id").eq("id", meeting.id).maybeSingle();
+      setState(data ? "hidden" : "save");
+    }
+    check();
+  }, [meeting.id]);
+
+  async function handleSave() {
+    setState("saving");
+    const sb = getSupabase();
+    if (!sb) { setState("save"); return; }
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { setState("save"); return; }
+
+    const newId = `shared-${meeting.id}-${session.user.id.slice(0, 8)}`;
+    await sb.from("meetings").upsert({
+      ...meeting,
+      id: newId,
+      folder: "personal",
+      sharetoken: null,
+      user_id: session.user.id,
+    });
+    setState("saved");
+  }
+
+  if (state === "hidden" || state === "checking") return null;
+
+  return (
+    <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between gap-4">
+      <p className="text-sm">
+        {state === "saved"
+          ? "Saved to your Personal folder in MeetingMind."
+          : "You're signed in to MeetingMind — save this meeting to your account?"}
+      </p>
+      {state !== "saved" && (
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={state === "saving"}
+          className="flex-shrink-0 px-4 py-1.5 rounded-lg bg-white text-violet-700 text-sm font-semibold
+            hover:bg-violet-50 transition-colors disabled:opacity-60"
+        >
+          {state === "saving" ? "Saving…" : "Save to my MeetingMind"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Share page ─────────────────────────────────────────────────────────────────
 
 const LANG_LABELS: Record<string, string> = { en: "English", zh: "Mandarin", sg: "Singlish", ms: "Malay" };
@@ -123,6 +185,9 @@ const LANG_LABELS: Record<string, string> = { en: "English", zh: "Mandarin", sg:
 export default function ShareView({ meeting }: { meeting: Meeting }) {
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Save banner (signed-in users only) */}
+      <SaveBanner meeting={meeting} />
+
       {/* Header */}
       <header className="bg-violet-700 text-white px-6 py-8">
         <div className="max-w-3xl mx-auto">

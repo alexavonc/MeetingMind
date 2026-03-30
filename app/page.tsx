@@ -100,6 +100,7 @@ export default function Home() {
     setSelectedFolder,
     folders,
     createFolder,
+    renameFolder,
     deleteFolder,
     settings,
     updateSettings,
@@ -166,6 +167,7 @@ export default function Home() {
           onDeleteMeeting={deleteMeeting}
           onRenameMeeting={renameMeeting}
           onCreateFolder={createFolder}
+          onRenameFolder={renameFolder}
           onDeleteFolder={deleteFolder}
           transcriptionProvider={settings.transcriptionProvider}
         />
@@ -201,6 +203,7 @@ export default function Home() {
               onDeleteMeeting={deleteMeeting}
               onRenameMeeting={renameMeeting}
               onCreateFolder={createFolder}
+              onRenameFolder={renameFolder}
               onDeleteFolder={deleteFolder}
             />
           </aside>

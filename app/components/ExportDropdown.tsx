@@ -166,20 +166,36 @@ export default function ExportDropdown({ meeting, activeTab, setActiveTab, onSha
 
       // ── Flowchart ─────────────────────────────────────────────────────────
       if (meeting.flow) {
-        // Switch to flowchart tab so React Flow is mounted, then capture
-        if (needSwitch) {
-          setActiveTab("flowchart");
-          await new Promise((r) => setTimeout(r, 600)); // wait for render
-        }
+        if (needSwitch) setActiveTab("flowchart");
 
-        const flowEl = document.querySelector(".react-flow") as HTMLElement | null;
+        // Poll until React Flow is in the DOM (up to 2.5 s)
+        const flowEl = await new Promise<HTMLElement | null>((resolve) => {
+          const deadline = Date.now() + 2500;
+          function check() {
+            const el = document.querySelector(".react-flow") as HTMLElement | null;
+            if (el) return resolve(el);
+            if (Date.now() > deadline) return resolve(null);
+            setTimeout(check, 80);
+          }
+          check();
+        });
+
         if (flowEl) {
           try {
+            // Scroll element into view so html2canvas can capture it
+            flowEl.scrollIntoView({ block: "nearest" });
+            await new Promise((r) => requestAnimationFrame(r));
+            await new Promise((r) => setTimeout(r, 200));
+
             const canvas = await html2canvas(flowEl, {
               backgroundColor: "#ffffff",
-              scale: 2,
+              scale: 1.5,
               logging: false,
               useCORS: true,
+              allowTaint: true,
+              foreignObjectRendering: false,
+              windowWidth: flowEl.scrollWidth,
+              windowHeight: flowEl.scrollHeight,
             });
             const imgData = canvas.toDataURL("image/png");
             const imgH = Math.min((canvas.height / canvas.width) * CW, H - 2 * M - 20);
@@ -193,7 +209,6 @@ export default function ExportDropdown({ meeting, activeTab, setActiveTab, onSha
           }
         }
 
-        // Restore tab
         if (needSwitch) setActiveTab(prevTab);
       }
 
