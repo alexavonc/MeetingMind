@@ -306,6 +306,31 @@ export function useMeetings() {
     }
   }, [meetings, settings.claudeKey]);
 
+  const renameFolder = useCallback((oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    // Update all meetings in this folder
+    setMeetings((prev) => {
+      const updated = prev.map((m) =>
+        m.folder === oldName ? { ...m, folder: trimmed } : m
+      );
+      // Batch-update Supabase for affected meetings
+      updated.filter((m) => m.folder === trimmed && prev.find((p) => p.id === m.id)?.folder === oldName)
+        .forEach((m) => dbUpdate(m.id, { folder: trimmed }));
+      saveDB(updated);
+      return updated;
+    });
+    setSelectedFolder((prev) => (prev === oldName ? trimmed : prev));
+    setSettings((prev) => {
+      const updated = {
+        ...prev,
+        folders: prev.folders.map((f) => (f === oldName ? trimmed : f)),
+      };
+      saveSettings(updated);
+      return updated;
+    });
+  }, []);
+
   const createFolder = useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -454,6 +479,7 @@ export function useMeetings() {
     setSelectedFolder,
     folders: settings.folders ?? ["personal"],
     createFolder,
+    renameFolder,
     deleteFolder,
     settings,
     updateSettings,
