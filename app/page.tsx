@@ -251,8 +251,6 @@ export default function Home() {
             <div className="md:hidden">
               <ExportDropdown
                 meeting={selectedMeeting}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 onShare={() => generateShareLink(selectedMeeting.id)}
                 iconOnly
               />
@@ -264,8 +262,6 @@ export default function Home() {
             {selectedMeeting && (
               <ExportDropdown
                 meeting={selectedMeeting}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 onShare={() => generateShareLink(selectedMeeting.id)}
               />
             )}
