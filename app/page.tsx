@@ -11,7 +11,7 @@ import FlowchartView from "./components/FlowchartView";
 import UploadModal from "./components/UploadModal";
 import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
-import ExportButton from "./components/ExportButton";
+import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingSteps from "./components/ProcessingSteps";
 import type { Folder } from "@/types";
@@ -100,6 +100,7 @@ export default function Home() {
     renameMeeting,
     moveMeeting,
     deleteMeeting,
+    generateShareLink,
     regenerateFlow,
     processUpload,
   } = useMeetings();
@@ -203,7 +204,14 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            {selectedMeeting && <ExportButton meeting={selectedMeeting} />}
+            {selectedMeeting && (
+              <ExportDropdown
+                meeting={selectedMeeting}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onShare={() => generateShareLink(selectedMeeting.id)}
+              />
+            )}
             <button
               type="button"
               onClick={() => setRecordOpen(true)}

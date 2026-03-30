@@ -239,6 +239,18 @@ export function useMeetings() {
     dbDelete(id);
   }, []);
 
+  const generateShareLink = useCallback(async (meetingId: string): Promise<string> => {
+    const meeting = meetings.find((m) => m.id === meetingId);
+    if (!meeting) throw new Error("Meeting not found");
+    let token = meeting.sharetoken;
+    if (!token) {
+      token = crypto.randomUUID();
+      setMeetings((prev) => prev.map((m) => m.id === meetingId ? { ...m, sharetoken: token! } : m));
+      await dbUpdate(meetingId, { sharetoken: token });
+    }
+    return `${window.location.origin}/share/${token}`;
+  }, [meetings]);
+
   const regenerateFlow = useCallback(async (meetingId: string) => {
     if (!settings.claudeKey) throw new Error("Claude API key not set");
     const meeting = meetings.find((m) => m.id === meetingId);
@@ -381,6 +393,7 @@ export function useMeetings() {
     renameMeeting,
     moveMeeting,
     deleteMeeting,
+    generateShareLink,
     regenerateFlow,
     processUpload,
   };
