@@ -21,16 +21,18 @@ async function dbLoad(): Promise<Meeting[] | null> {
   return (data ?? []) as Meeting[];
 }
 
-async function dbUpsert(meeting: Meeting) {
+async function dbUpsert(meeting: Meeting, userId?: string) {
   const sb = getSupabase();
   if (!sb) return;
-  await sb.from("meetings").upsert(meeting);
+  const row = userId ? { ...meeting, user_id: userId } : meeting;
+  await sb.from("meetings").upsert(row);
 }
 
-async function dbUpsertMany(meetings: Meeting[]) {
+async function dbUpsertMany(meetings: Meeting[], userId?: string) {
   const sb = getSupabase();
   if (!sb) return;
-  await sb.from("meetings").upsert(meetings);
+  const rows = userId ? meetings.map((m) => ({ ...m, user_id: userId })) : meetings;
+  await sb.from("meetings").upsert(rows);
 }
 
 async function dbUpdate(id: string, patch: Partial<Meeting>) {
@@ -49,6 +51,7 @@ async function dbDelete(id: string) {
 
 export function useMeetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
     claudeKey: "", whisperKey: "", transcriptionProvider: "groq",
     ingestSecret: "", hfToken: "", hfEndpointUrl: "",
@@ -59,11 +62,35 @@ export function useMeetings() {
     active: false, step: null, error: null,
   });
 
+  // Track the logged-in user
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    sb.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Hydrate on mount — Supabase if configured, else localStorage
   useEffect(() => {
     setSettings(loadSettings());
 
-    dbLoad().then((remote) => {
+    const sb = getSupabase();
+
+    // Claim any orphaned meetings (no user_id) and assign them to this user.
+    // Uses the service-role API route so it can bypass RLS.
+    async function claimOrphaned(accessToken: string) {
+      try {
+        await fetch("/api/auth/claim-meetings", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch { /* best-effort */ }
+    }
+
+    dbLoad().then(async (remote) => {
       if (remote === null) {
         // Supabase not configured — use localStorage
         const local = loadDB();
@@ -76,11 +103,26 @@ export function useMeetings() {
         return;
       }
 
+      // Claim orphaned meetings before loading (no-op if already claimed)
+      if (sb) {
+        const { data } = await sb.auth.getSession();
+        if (data.session?.access_token) {
+          await claimOrphaned(data.session.access_token);
+          // Reload after claiming so we see the newly-claimed meetings
+          const refreshed = await dbLoad();
+          if (refreshed && refreshed.length > 0) {
+            setMeetings(refreshed);
+            return;
+          }
+        }
+      }
+
       if (remote.length === 0) {
         // Supabase is empty — migrate localStorage meetings if any
         const local = loadDB().filter((m) => !m.id.startsWith("seed-"));
         if (local.length > 0) {
-          dbUpsertMany(local);
+          const uid = sb ? (await sb.auth.getSession()).data.session?.user.id : undefined;
+          dbUpsertMany(local, uid);
           setMeetings(local);
         } else {
           setMeetings(SEED_MEETINGS);
@@ -360,7 +402,7 @@ export function useMeetings() {
           saveDB(updated);
           return updated;
         });
-        await dbUpsert(newMeeting); // save to Supabase
+        await dbUpsert(newMeeting, userId ?? undefined); // save to Supabase with user_id
 
         setSelectedFolder(folder);
         setSelectedId(newMeeting.id);
