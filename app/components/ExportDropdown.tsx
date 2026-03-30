@@ -20,9 +20,10 @@ interface Props {
   activeTab: string;
   setActiveTab: (tab: "transcript" | "summary" | "flowchart") => void;
   onShare: () => Promise<string>;
+  iconOnly?: boolean;
 }
 
-export default function ExportDropdown({ meeting, activeTab, setActiveTab, onShare }: Props) {
+export default function ExportDropdown({ meeting, activeTab, setActiveTab, onShare, iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied">("idle");
@@ -230,17 +231,19 @@ export default function ExportDropdown({ meeting, activeTab, setActiveTab, onSha
         type="button"
         onClick={() => setOpen((o) => !o)}
         disabled={pdfLoading || shareState === "loading"}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+        className={`flex items-center gap-1.5 rounded-lg text-sm font-medium
           bg-secondary hover:bg-secondary/80 text-foreground border border-border
-          transition-colors disabled:opacity-50"
+          transition-colors disabled:opacity-50
+          ${iconOnly ? "p-2" : "px-3 py-1.5"}`}
+        aria-label="Export"
       >
         {shareState === "copied" ? (
           <Check className="w-4 h-4 text-green-600" />
         ) : (
           <Download className={`w-4 h-4 ${pdfLoading ? "animate-bounce" : ""}`} />
         )}
-        {pdfLoading ? "Exporting…" : shareState !== "idle" ? shareLabel : "Export"}
-        {!pdfLoading && shareState === "idle" && <ChevronDown className="w-3.5 h-3.5 opacity-60" />}
+        {!iconOnly && (pdfLoading ? "Exporting…" : shareState !== "idle" ? shareLabel : "Export")}
+        {!iconOnly && !pdfLoading && shareState === "idle" && <ChevronDown className="w-3.5 h-3.5 opacity-60" />}
       </button>
 
       {open && (

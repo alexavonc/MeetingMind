@@ -49,14 +49,14 @@ export default function RecordModal({ open, onClose, processing, onSubmit }: Pro
   const canProcess = state === "stopped" && title.trim() && !processing.active;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={!processing.active && state !== "recording" ? handleClose : undefined}
       />
-      <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative z-10 w-full sm:max-w-md bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
           <h2 className="font-semibold text-foreground">Record Meeting</h2>
           {!processing.active && state !== "recording" && (
             <button type="button" onClick={handleClose} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -65,7 +65,7 @@ export default function RecordModal({ open, onClose, processing, onSubmit }: Pro
           )}
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           {processing.active ? (
             <ProcessingSteps currentStep={processing.step} error={processing.error} />
           ) : (

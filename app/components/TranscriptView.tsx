@@ -41,8 +41,8 @@ export default function TranscriptView({ meeting }: Props) {
           const name = meeting.speakers[utterance.s] ?? utterance.s;
 
           return (
-            <div key={idx} className="flex gap-3">
-              <div className="flex-shrink-0 flex flex-col items-end gap-0.5 pt-0.5 w-24">
+            <div key={idx} className="flex gap-2.5">
+              <div className="flex-shrink-0 flex flex-col items-end gap-0.5 pt-0.5 w-16 sm:w-24">
                 <span className={`text-xs font-semibold ${colorClass}`}>
                   {name.split(" ")[0]}
                 </span>

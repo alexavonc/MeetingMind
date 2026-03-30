@@ -62,11 +62,14 @@ export default function AudioPlayer({ url }: { url: string }) {
 
       <div className="flex-1 flex items-center gap-2 min-w-0">
         <span className="text-xs tabular-nums text-muted-foreground flex-shrink-0">{fmt(current)}</span>
-        <div className="relative flex-1 h-1.5 rounded-full bg-border overflow-hidden">
-          <div
-            className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-            style={{ width: `${pct}%` }}
-          />
+        {/* Taller hit area for touch */}
+        <div className="relative flex-1 flex items-center h-7">
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-border overflow-hidden pointer-events-none">
+            <div
+              className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
           <input
             type="range"
             min={0}
@@ -74,7 +77,7 @@ export default function AudioPlayer({ url }: { url: string }) {
             step={0.1}
             value={current}
             onChange={seek}
-            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
         </div>
         <span className="text-xs tabular-nums text-muted-foreground flex-shrink-0">

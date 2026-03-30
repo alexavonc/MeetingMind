@@ -203,6 +203,20 @@ export default function Home() {
             )}
           </div>
 
+          {/* Mobile: export icon when meeting selected */}
+          {selectedMeeting && (
+            <div className="md:hidden">
+              <ExportDropdown
+                meeting={selectedMeeting}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onShare={() => generateShareLink(selectedMeeting.id)}
+                iconOnly
+              />
+            </div>
+          )}
+
+          {/* Desktop actions */}
           <div className="hidden md:flex items-center gap-2">
             {selectedMeeting && (
               <ExportDropdown
@@ -244,26 +258,26 @@ export default function Home() {
             />
 
             {/* Tab bar */}
-            <div className="flex border-b border-border px-4 flex-shrink-0">
+            <div className="flex border-b border-border flex-shrink-0">
               {TABS.map((tab) => (
                 <button
                   key={tab.value}
                   type="button"
                   onClick={() => setActiveTab(tab.value)}
-                  className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.value
                       ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {tab.icon}
-                  {tab.label}
+                  <span className="hidden xs:inline sm:inline">{tab.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Tab content — replaced by progress UI while reprocessing */}
-            <div className="flex-1 overflow-y-auto px-4 py-5">
+            <div className="flex-1 overflow-y-auto px-4 py-5 pb-28 md:pb-5">
               {processing.active ? (
                 <div className="max-w-sm mx-auto mt-8">
                   <ProcessingSteps currentStep={processing.step} error={processing.error} detail={processing.detail} />
