@@ -12,6 +12,7 @@ interface Props {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   currentFolder: Folder;
+  allFolders: string[];
 }
 
 const LANG_BADGES: Record<Language, { label: string; className: string }> = {
@@ -21,21 +22,17 @@ const LANG_BADGES: Record<Language, { label: string; className: string }> = {
   sg: { label: "SG", className: "bg-pink-100 text-pink-700 border-pink-200" },
 };
 
-const FOLDERS: { value: Folder; label: string }[] = [
-  { value: "govtech", label: "Govtech" },
-  { value: "flow-three", label: "flow-three" },
-  { value: "personal", label: "Personal" },
-];
-
 function MeetingMenu({
   meeting,
   currentFolder,
+  allFolders,
   onMove,
   onDelete,
   onRename,
 }: {
   meeting: Meeting;
   currentFolder: Folder;
+  allFolders: string[];
   onMove: (folder: Folder) => void;
   onDelete: () => void;
   onRename: () => void;
@@ -104,19 +101,19 @@ function MeetingMenu({
           ) : (
             <>
               <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Move to folder</p>
-              {FOLDERS.filter((f) => f.value !== currentFolder).map((f) => (
+              {allFolders.filter((f) => f !== currentFolder).map((f) => (
                 <button
-                  key={f.value}
+                  key={f}
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setOpen(false);
                     setShowMove(false);
-                    onMove(f.value);
+                    onMove(f);
                   }}
                   className="flex items-center w-full px-3 py-2 hover:bg-secondary text-foreground transition-colors"
                 >
-                  {f.label}
+                  {f}
                 </button>
               ))}
             </>
@@ -127,7 +124,7 @@ function MeetingMenu({
   );
 }
 
-export default function MeetingList({ meetings, selectedId, onSelect, onMove, onDelete, onRename, currentFolder }: Props) {
+export default function MeetingList({ meetings, selectedId, onSelect, onMove, onDelete, onRename, currentFolder, allFolders }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameRef = useRef<HTMLInputElement>(null);
@@ -200,6 +197,7 @@ export default function MeetingList({ meetings, selectedId, onSelect, onMove, on
                 <MeetingMenu
                   meeting={meeting}
                   currentFolder={currentFolder}
+                  allFolders={allFolders}
                   onMove={(folder) => onMove(meeting.id, folder)}
                   onDelete={() => onDelete(meeting.id)}
                   onRename={() => startRename(meeting)}

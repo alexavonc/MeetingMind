@@ -98,6 +98,9 @@ export default function Home() {
     setSelectedId,
     selectedFolder,
     setSelectedFolder,
+    folders,
+    createFolder,
+    deleteFolder,
     settings,
     updateSettings,
     processing,
@@ -155,12 +158,15 @@ export default function Home() {
           meetings={meetings}
           selectedId={selectedId}
           selectedFolder={selectedFolder}
+          folders={folders}
           onSelectFolder={setSelectedFolder}
           onSelectMeeting={handleSelectMeeting}
           onOpenSettings={() => setSettingsOpen(true)}
           onMoveMeeting={moveMeeting}
           onDeleteMeeting={deleteMeeting}
           onRenameMeeting={renameMeeting}
+          onCreateFolder={createFolder}
+          onDeleteFolder={deleteFolder}
           transcriptionProvider={settings.transcriptionProvider}
         />
       </aside>
@@ -187,12 +193,15 @@ export default function Home() {
               meetings={meetings}
               selectedId={selectedId}
               selectedFolder={selectedFolder}
+              folders={folders}
               onSelectFolder={setSelectedFolder}
               onSelectMeeting={handleSelectMeeting}
               onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
               onMoveMeeting={moveMeeting}
               onDeleteMeeting={deleteMeeting}
               onRenameMeeting={renameMeeting}
+              onCreateFolder={createFolder}
+              onDeleteFolder={deleteFolder}
             />
           </aside>
         </div>
@@ -382,6 +391,7 @@ export default function Home() {
         onClose={() => setUploadOpen(false)}
         processing={processing}
         onSubmit={handleProcessUpload}
+        folders={folders}
       />
 
       <SettingsModal
@@ -397,6 +407,7 @@ export default function Home() {
         onClose={() => setRecordOpen(false)}
         processing={processing}
         onSubmit={handleProcessUpload}
+        folders={folders}
       />
 
       {costOpen && selectedMeeting && (

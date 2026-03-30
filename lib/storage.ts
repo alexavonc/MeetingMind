@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   ingestSecret: "",
   hfToken: "",
   hfEndpointUrl: "",
+  folders: ["personal"],
 };
 
 export function loadSettings(): Settings {

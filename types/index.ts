@@ -12,7 +12,7 @@ export interface Action {
   done: boolean;
 }
 
-export type Folder = "govtech" | "flow-three" | "personal";
+export type Folder = string;
 
 export interface Meeting {
   id: string;
@@ -39,6 +39,7 @@ export interface Settings {
   ingestSecret: string; // token for the /api/ingest Watch → webhook endpoint
   hfToken: string;      // HuggingFace API token
   hfEndpointUrl: string; // HF Inference Endpoint URL (blank = use serverless API)
+  folders: string[];    // user-defined folder list
 }
 
 export type ProcessingStep =

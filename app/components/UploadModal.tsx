@@ -6,25 +6,20 @@ import type { Folder } from "@/types";
 import type { ProcessingState } from "@/types";
 import ProcessingSteps from "./ProcessingSteps";
 
-const FOLDERS: { value: Folder; label: string }[] = [
-  { value: "govtech", label: "Govtech" },
-  { value: "flow-three", label: "flow-three" },
-  { value: "personal", label: "Personal" },
-];
-
 interface Props {
   open: boolean;
   onClose: () => void;
   processing: ProcessingState;
   onSubmit: (input: File | File[] | string, title: string, folder: Folder) => Promise<void>;
+  folders: string[];
 }
 
 type Mode = "audio" | "text";
 
-export default function UploadModal({ open, onClose, processing, onSubmit }: Props) {
+export default function UploadModal({ open, onClose, processing, onSubmit, folders }: Props) {
   const [mode, setMode] = useState<Mode>("audio");
   const [title, setTitle] = useState("");
-  const [folder, setFolder] = useState<Folder>("govtech");
+  const [folder, setFolder] = useState<Folder>("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [rawText, setRawText] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -127,8 +122,8 @@ export default function UploadModal({ open, onClose, processing, onSubmit }: Pro
                     className="w-full px-3 py-2 rounded-lg bg-input border border-border text-sm text-foreground
                       appearance-none focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    {FOLDERS.map((f) => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
+                    {folders.map((f) => (
+                      <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
