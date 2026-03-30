@@ -2,7 +2,9 @@
 
 import { Settings } from "lucide-react";
 import type { Folder, Meeting } from "@/types";
+import type { TranscriptionProvider } from "@/types";
 import MeetingList from "./MeetingList";
+import CostSummaryBar from "./CostSummaryBar";
 
 const FOLDERS: { value: Folder; label: string; emoji: string }[] = [
   { value: "govtech", label: "Govtech", emoji: "🏛️" },
@@ -20,6 +22,7 @@ interface Props {
   onMoveMeeting: (id: string, folder: Folder) => void;
   onDeleteMeeting: (id: string) => void;
   onRenameMeeting: (id: string, title: string) => void;
+  transcriptionProvider?: TranscriptionProvider;
 }
 
 export default function Sidebar({
@@ -32,6 +35,7 @@ export default function Sidebar({
   onMoveMeeting,
   onDeleteMeeting,
   onRenameMeeting,
+  transcriptionProvider = "groq",
 }: Props) {
   const folderMeetings = meetings.filter((m) => m.folder === selectedFolder);
 
@@ -90,6 +94,9 @@ export default function Sidebar({
           currentFolder={selectedFolder}
         />
       </div>
+
+      {/* Cost summary across all meetings */}
+      <CostSummaryBar meetings={meetings} provider={transcriptionProvider} />
 
       {/* Footer */}
       <div className="flex-shrink-0 px-4 py-3 border-t border-border">

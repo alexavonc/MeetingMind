@@ -16,6 +16,8 @@ import RecordModal from "./components/RecordModal";
 import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingSteps from "./components/ProcessingSteps";
+import CostModal from "./components/CostModal";
+import { estimateMeetingCost, formatUSD } from "@/lib/costs";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
@@ -128,6 +130,7 @@ export default function Home() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
 
   function handleSelectMeeting(id: string) {
     setSelectedId(id);
@@ -158,6 +161,7 @@ export default function Home() {
           onMoveMeeting={moveMeeting}
           onDeleteMeeting={deleteMeeting}
           onRenameMeeting={renameMeeting}
+          transcriptionProvider={settings.transcriptionProvider}
         />
       </aside>
 
@@ -213,6 +217,15 @@ export default function Home() {
                 <span className="text-xs text-muted-foreground flex-shrink-0">
                   {selectedMeeting.date} · {selectedMeeting.duration}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setCostOpen(true)}
+                  className="text-[11px] font-mono font-medium px-1.5 py-0.5 rounded-md
+                    bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0"
+                  title="View cost breakdown"
+                >
+                  ~{formatUSD(estimateMeetingCost(selectedMeeting, settings.transcriptionProvider ?? "groq").total)}
+                </button>
               </div>
             ) : (
               <h2 className="font-semibold text-base text-muted-foreground">
@@ -385,6 +398,14 @@ export default function Home() {
         processing={processing}
         onSubmit={handleProcessUpload}
       />
+
+      {costOpen && selectedMeeting && (
+        <CostModal
+          meeting={selectedMeeting}
+          provider={settings.transcriptionProvider ?? "groq"}
+          onClose={() => setCostOpen(false)}
+        />
+      )}
     </div>
   );
 }
