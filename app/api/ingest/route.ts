@@ -137,7 +137,11 @@ SUMMARY: ${summary}`;
 
     // Save to Supabase if configured
     const sb = getServerSupabase();
-    if (sb) await sb.from("meetings").upsert(meeting);
+    if (sb) {
+      const adminUserId = process.env.ADMIN_USER_ID;
+      const row = adminUserId ? { ...meeting, user_id: adminUserId } : meeting;
+      await sb.from("meetings").upsert(row);
+    }
 
     return NextResponse.json({ meeting });
   } catch (err) {

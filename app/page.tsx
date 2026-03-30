@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
+import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "./components/Sidebar";
 import TranscriptView from "./components/TranscriptView";
 import SummaryView from "./components/SummaryView";
@@ -84,6 +86,22 @@ const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
 ];
 
 export default function Home() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/login");
+  }, [user, authLoading, router]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   const {
     meetings,
     selectedMeeting,
@@ -358,6 +376,7 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSave={updateSettings}
+        user={user}
       />
 
       <RecordModal

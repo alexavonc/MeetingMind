@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { X, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { X, Eye, EyeOff, Copy, Check, LogOut } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 import type { Settings, TranscriptionProvider } from "@/types";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   settings: Settings;
   onSave: (s: Settings) => void;
+  user?: User | null;
 }
 
-export default function SettingsModal({ open, onClose, settings, onSave }: Props) {
+export default function SettingsModal({ open, onClose, settings, onSave, user }: Props) {
   const [claudeKey, setClaudeKey] = useState(settings.claudeKey);
   const [whisperKey, setWhisperKey] = useState(settings.whisperKey);
   const [provider, setProvider] = useState<TranscriptionProvider>(settings.transcriptionProvider ?? "groq");
@@ -213,6 +216,9 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
             </div>
           </div>
 
+          {/* Signed-in account */}
+          {user && <AccountSection user={user} onClose={onClose} />}
+
           {/* Cost note */}
           <div className="text-xs text-muted-foreground space-y-1 pt-1 border-t border-border">
             <p className="font-medium text-foreground/60">Estimated cost per meeting</p>
@@ -230,6 +236,38 @@ export default function SettingsModal({ open, onClose, settings, onSave }: Props
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AccountSection({ user, onClose }: { user: User; onClose: () => void }) {
+  const { signOut } = useAuth();
+  const email = user.email ?? "—";
+  const name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? email;
+  const avatar = user.user_metadata?.avatar_url as string | undefined;
+
+  return (
+    <div className="p-3 rounded-xl bg-secondary/40 border border-border flex items-center gap-3">
+      {avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatar} alt={name} className="w-9 h-9 rounded-full flex-shrink-0 object-cover" />
+      ) : (
+        <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+          {name.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{name}</p>
+        <p className="text-xs text-muted-foreground truncate">{email}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => { onClose(); signOut(); }}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        Sign out
+      </button>
     </div>
   );
 }
