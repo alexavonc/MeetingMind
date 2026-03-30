@@ -6,22 +6,17 @@ import { useRecorder, formatDuration } from "@/hooks/useRecorder";
 import ProcessingSteps from "./ProcessingSteps";
 import type { Folder, ProcessingState } from "@/types";
 
-const FOLDERS: { value: Folder; label: string }[] = [
-  { value: "govtech", label: "Govtech" },
-  { value: "flow-three", label: "flow-three" },
-  { value: "personal", label: "Personal" },
-];
-
 interface Props {
   open: boolean;
   onClose: () => void;
   processing: ProcessingState;
   onSubmit: (file: File, title: string, folder: Folder) => Promise<void>;
+  folders: string[];
 }
 
-export default function RecordModal({ open, onClose, processing, onSubmit }: Props) {
+export default function RecordModal({ open, onClose, processing, onSubmit, folders }: Props) {
   const [title, setTitle] = useState("");
-  const [folder, setFolder] = useState<Folder>("govtech");
+  const [folder, setFolder] = useState<Folder>("personal");
   const { state, duration, error: recError, levels, start, stop, reset, toFile } = useRecorder();
 
   if (!open) return null;
@@ -100,8 +95,8 @@ export default function RecordModal({ open, onClose, processing, onSubmit }: Pro
                     className="w-full px-3 py-2 rounded-lg bg-input border border-border text-sm text-foreground
                       appearance-none focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                   >
-                    {FOLDERS.map((f) => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
+                    {folders.map((f) => (
+                      <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />

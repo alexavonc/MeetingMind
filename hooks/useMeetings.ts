@@ -54,10 +54,10 @@ export function useMeetings() {
   const [userId, setUserId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
     claudeKey: "", whisperKey: "", transcriptionProvider: "groq",
-    ingestSecret: "", hfToken: "", hfEndpointUrl: "",
+    ingestSecret: "", hfToken: "", hfEndpointUrl: "", folders: ["personal"],
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState<Folder>("govtech");
+  const [selectedFolder, setSelectedFolder] = useState<Folder>("personal");
   const [processing, setProcessing] = useState<ProcessingState>({
     active: false, step: null, error: null,
   });
@@ -93,13 +93,8 @@ export function useMeetings() {
     dbLoad().then(async (remote) => {
       if (remote === null) {
         // Supabase not configured — use localStorage
-        const local = loadDB();
-        if (local.length === 0) {
-          setMeetings(SEED_MEETINGS);
-          saveDB(SEED_MEETINGS);
-        } else {
-          setMeetings(local);
-        }
+        const local = loadDB().filter((m) => !m.id.startsWith("seed-"));
+        setMeetings(local);
         return;
       }
 
@@ -118,15 +113,14 @@ export function useMeetings() {
       }
 
       if (remote.length === 0) {
-        // Supabase is empty — migrate localStorage meetings if any
+        // Supabase is empty — migrate localStorage meetings if any (skip seeds)
         const local = loadDB().filter((m) => !m.id.startsWith("seed-"));
         if (local.length > 0) {
           const uid = sb ? (await sb.auth.getSession()).data.session?.user.id : undefined;
           dbUpsertMany(local, uid);
           setMeetings(local);
-        } else {
-          setMeetings(SEED_MEETINGS);
         }
+        // else: genuinely new user — start with empty state
         return;
       }
 
@@ -312,6 +306,38 @@ export function useMeetings() {
     }
   }, [meetings, settings.claudeKey]);
 
+  const createFolder = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSettings((prev) => {
+      if (prev.folders.includes(trimmed)) return prev;
+      const updated = { ...prev, folders: [...prev.folders, trimmed] };
+      saveSettings(updated);
+      return updated;
+    });
+  }, []);
+
+  const deleteFolder = useCallback((name: string) => {
+    setMeetings((prev) => {
+      const toDelete = prev.filter((m) => m.folder === name);
+      toDelete.forEach((m) => dbDelete(m.id));
+      const updated = prev.filter((m) => m.folder !== name);
+      saveDB(updated);
+      return updated;
+    });
+    // Clear selection if the selected meeting was in this folder
+    setSelectedId((prevId) => {
+      const inFolder = meetings.some((m) => m.id === prevId && m.folder === name);
+      return inFolder ? null : prevId;
+    });
+    setSelectedFolder((prev) => (prev === name ? "personal" : prev));
+    setSettings((prev) => {
+      const updated = { ...prev, folders: prev.folders.filter((f) => f !== name) };
+      saveSettings(updated);
+      return updated;
+    });
+  }, [meetings]);
+
   const processUpload = useCallback(
     async (input: File | File[] | string, title: string, folder: Folder) => {
       if (!settings.claudeKey) throw new Error("Claude API key not set");
@@ -426,6 +452,9 @@ export function useMeetings() {
     setSelectedId,
     selectedFolder,
     setSelectedFolder,
+    folders: settings.folders ?? ["personal"],
+    createFolder,
+    deleteFolder,
     settings,
     updateSettings,
     processing,

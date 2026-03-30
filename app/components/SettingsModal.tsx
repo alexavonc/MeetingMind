@@ -37,6 +37,7 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
       ingestSecret: ingestSecret.trim(),
       hfToken: hfToken.trim(),
       hfEndpointUrl: hfEndpointUrl.trim(),
+      folders: settings.folders ?? ["personal"],
     });
     onClose();
   }
