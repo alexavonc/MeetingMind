@@ -88,22 +88,9 @@ const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
 ];
 
 export default function Home() {
+  // ── All hooks must come before any conditional returns ──────────────────────
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) router.replace("/login");
-  }, [user, authLoading, router]);
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
   const {
     meetings,
     selectedMeeting,
@@ -124,13 +111,26 @@ export default function Home() {
     regenerateFlow,
     processUpload,
   } = useMeetings();
-
   const [activeTab, setActiveTab] = useState<Tab>("transcript");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/login");
+  }, [user, authLoading, router]);
+
+  // Auth loading / not signed in — show spinner (redirect handled above)
+  if (authLoading || !user) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   function handleSelectMeeting(id: string) {
     setSelectedId(id);
