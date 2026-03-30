@@ -75,9 +75,22 @@ export function useMeetings() {
 
   // Hydrate on mount — Supabase if configured, else localStorage
   useEffect(() => {
-    setSettings(loadSettings());
-
     const sb = getSupabase();
+
+    /** Add any folder names found in loaded meetings that aren't in the stored list. */
+    function syncFolders(loadedMeetings: Meeting[]) {
+      setSettings((prev) => {
+        const discovered = loadedMeetings
+          .map((m) => m.folder)
+          .filter((f) => f && !prev.folders.includes(f));
+        if (discovered.length === 0) return prev;
+        const updated = { ...prev, folders: [...prev.folders, ...new Set(discovered)] };
+        saveSettings(updated);
+        return updated;
+      });
+    }
+
+    setSettings(loadSettings());
 
     // Claim any orphaned meetings (no user_id) and assign them to this user.
     // Uses the service-role API route so it can bypass RLS.
@@ -95,6 +108,7 @@ export function useMeetings() {
         // Supabase not configured — use localStorage
         const local = loadDB().filter((m) => !m.id.startsWith("seed-"));
         setMeetings(local);
+        syncFolders(local);
         return;
       }
 
@@ -107,6 +121,7 @@ export function useMeetings() {
           const refreshed = await dbLoad();
           if (refreshed && refreshed.length > 0) {
             setMeetings(refreshed);
+            syncFolders(refreshed);
             return;
           }
         }
@@ -119,12 +134,14 @@ export function useMeetings() {
           const uid = sb ? (await sb.auth.getSession()).data.session?.user.id : undefined;
           dbUpsertMany(local, uid);
           setMeetings(local);
+          syncFolders(local);
         }
         // else: genuinely new user — start with empty state
         return;
       }
 
       setMeetings(remote);
+      syncFolders(remote);
     });
   }, []);
 
