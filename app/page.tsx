@@ -16,6 +16,8 @@ import RecordModal from "./components/RecordModal";
 import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
 import ProcessingSteps from "./components/ProcessingSteps";
+import CostModal from "./components/CostModal";
+import { estimateMeetingCost, formatUSD } from "@/lib/costs";
 import type { Folder } from "@/types";
 
 type Tab = "transcript" | "summary" | "flowchart";
@@ -86,22 +88,9 @@ const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
 ];
 
 export default function Home() {
+  // ── All hooks must come before any conditional returns ──────────────────────
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) router.replace("/login");
-  }, [user, authLoading, router]);
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
   const {
     meetings,
     selectedMeeting,
@@ -122,12 +111,26 @@ export default function Home() {
     regenerateFlow,
     processUpload,
   } = useMeetings();
-
   const [activeTab, setActiveTab] = useState<Tab>("transcript");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/login");
+  }, [user, authLoading, router]);
+
+  // Auth loading / not signed in — show spinner (redirect handled above)
+  if (authLoading || !user) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   function handleSelectMeeting(id: string) {
     setSelectedId(id);
@@ -158,6 +161,7 @@ export default function Home() {
           onMoveMeeting={moveMeeting}
           onDeleteMeeting={deleteMeeting}
           onRenameMeeting={renameMeeting}
+          transcriptionProvider={settings.transcriptionProvider}
         />
       </aside>
 
@@ -213,6 +217,15 @@ export default function Home() {
                 <span className="text-xs text-muted-foreground flex-shrink-0">
                   {selectedMeeting.date} · {selectedMeeting.duration}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setCostOpen(true)}
+                  className="text-[11px] font-mono font-medium px-1.5 py-0.5 rounded-md
+                    bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0"
+                  title="View cost breakdown"
+                >
+                  ~{formatUSD(estimateMeetingCost(selectedMeeting, settings.transcriptionProvider ?? "groq").total)}
+                </button>
               </div>
             ) : (
               <h2 className="font-semibold text-base text-muted-foreground">
@@ -385,6 +398,14 @@ export default function Home() {
         processing={processing}
         onSubmit={handleProcessUpload}
       />
+
+      {costOpen && selectedMeeting && (
+        <CostModal
+          meeting={selectedMeeting}
+          provider={settings.transcriptionProvider ?? "groq"}
+          onClose={() => setCostOpen(false)}
+        />
+      )}
     </div>
   );
 }
