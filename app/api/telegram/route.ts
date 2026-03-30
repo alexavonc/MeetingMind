@@ -136,6 +136,18 @@ interface TgUpdate {
   };
 }
 
+/** Look up which Supabase user owns this Telegram chat ID. Returns null if unlinked. */
+async function resolveUserId(chatId: number): Promise<string | null> {
+  const sb = getServerSupabase();
+  if (!sb) return null;
+  const { data } = await sb
+    .from("telegram_links")
+    .select("user_id")
+    .eq("telegram_chat_id", chatId)
+    .maybeSingle();
+  return data?.user_id ?? null;
+}
+
 export async function POST(req: NextRequest) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const groqKey = process.env.GROQ_API_KEY;
@@ -155,6 +167,48 @@ export async function POST(req: NextRequest) {
 
   const chatId = msg.chat.id;
 
+  // ── /start <token> — link this Telegram chat to a MeetingMind account ───────
+  if (msg.text?.startsWith("/start")) {
+    const linkToken = msg.text.split(" ")[1]?.trim();
+    if (!linkToken) {
+      await tgSend(token, chatId,
+        "👋 <b>MeetingMind bot</b>\n\nSend me a voice note or audio file and I'll transcribe and summarise your meeting.\n\nTo link your account, use the <b>Link Telegram</b> button in the MeetingMind Settings.");
+      return NextResponse.json({ ok: true });
+    }
+
+    const sb = getServerSupabase();
+    if (!sb) return NextResponse.json({ ok: true });
+
+    // Validate the token
+    const { data: row } = await sb
+      .from("telegram_link_tokens")
+      .select("user_id, expires_at")
+      .eq("token", linkToken)
+      .maybeSingle();
+
+    if (!row) {
+      await tgSend(token, chatId, "❌ Invalid or already-used link code. Generate a new one from MeetingMind Settings.");
+      return NextResponse.json({ ok: true });
+    }
+    if (new Date(row.expires_at) < new Date()) {
+      await tgSend(token, chatId, "⏰ This link code has expired. Generate a new one from MeetingMind Settings.");
+      await sb.from("telegram_link_tokens").delete().eq("token", linkToken);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Persist the chat_id → user_id mapping
+    await sb.from("telegram_links").upsert(
+      { telegram_chat_id: chatId, user_id: row.user_id },
+      { onConflict: "telegram_chat_id" }
+    );
+    // Consume the token
+    await sb.from("telegram_link_tokens").delete().eq("token", linkToken);
+
+    await tgSend(token, chatId,
+      "✅ <b>Account linked!</b>\n\nYour Telegram is now connected to MeetingMind. Send me any voice note or audio file and your meeting will appear in your dashboard.");
+    return NextResponse.json({ ok: true });
+  }
+
   // Non-audio message → send instructions
   const fileRef =
     msg.voice ??
@@ -165,7 +219,7 @@ export async function POST(req: NextRequest) {
     await tgSend(
       token,
       chatId,
-      "👋 <b>MeetingMind bot</b>\n\nSend me a voice note or audio file and I'll transcribe and summarise your meeting automatically."
+      "👋 <b>MeetingMind bot</b>\n\nSend me a voice note or audio file and I'll transcribe and summarise your meeting automatically.\n\nTo link your account, use the <b>Link Telegram</b> button in MeetingMind Settings."
     );
     return NextResponse.json({ ok: true });
   }
@@ -291,8 +345,10 @@ DISCUSSION: ${excerpts}`;
     };
     const sb = getServerSupabase();
     if (sb) {
-      const adminUserId = process.env.ADMIN_USER_ID;
-      const row = adminUserId ? { ...meeting, user_id: adminUserId } : meeting;
+      // Use the linked user's ID if available, otherwise fall back to ADMIN_USER_ID
+      const linkedUserId = await resolveUserId(chatId);
+      const userId = linkedUserId ?? process.env.ADMIN_USER_ID;
+      const row = userId ? { ...meeting, user_id: userId } : meeting;
       await sb.from("meetings").upsert(row);
     }
 
