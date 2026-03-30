@@ -152,7 +152,7 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
       )}
 
       {flowData && nodes.length > 0 ? (
-        <div className="w-full rounded-xl border border-border overflow-hidden" style={{ height: 460 }}>
+        <div className="w-full rounded-xl border border-border overflow-hidden" style={{ height: "min(460px, 65vh)" }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}

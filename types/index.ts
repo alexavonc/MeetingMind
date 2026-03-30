@@ -26,7 +26,8 @@ export interface Meeting {
   summary: string;
   actions: Action[];
   flow: string;
-  audiourl?: string;  // Supabase Storage public URL (column name lowercase to match Supabase convention)
+  audiourl?: string;   // Supabase Storage public URL (column name lowercase to match Supabase convention)
+  sharetoken?: string; // random UUID used to build public share links
 }
 
 export type TranscriptionProvider = "openai" | "groq" | "huggingface";

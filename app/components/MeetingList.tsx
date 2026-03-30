@@ -61,7 +61,7 @@ function MeetingMenu({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); setShowMove(false); }}
-        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
         aria-label="Meeting options"
       >
         <MoreVertical className="w-3.5 h-3.5" />
