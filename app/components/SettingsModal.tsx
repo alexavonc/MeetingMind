@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X, Eye, EyeOff, Copy, Check, LogOut } from "lucide-react";
+import { X, Eye, EyeOff, Copy, Check, LogOut, Send } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type { Settings, TranscriptionProvider } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
+import { getSupabase } from "@/lib/supabase";
 
 interface Props {
   open: boolean;
@@ -216,6 +217,9 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
             </div>
           </div>
 
+          {/* Telegram bot linking */}
+          {user && <TelegramLinkSection />}
+
           {/* Signed-in account */}
           {user && <AccountSection user={user} onClose={onClose} />}
 
@@ -236,6 +240,91 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TelegramLinkSection() {
+  const [step, setStep] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [linkCmd, setLinkCmd] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function handleGenerate() {
+    setStep("loading");
+    try {
+      const sb = getSupabase();
+      const { data: { session } } = await sb!.auth.getSession();
+      if (!session) throw new Error("Not signed in");
+      const res = await fetch("/api/telegram/generate-link", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error("Failed");
+      const { token } = await res.json() as { token: string };
+      setLinkCmd(`/start ${token}`);
+      setStep("done");
+    } catch {
+      setStep("error");
+    }
+  }
+
+  async function copyCmd() {
+    await navigator.clipboard.writeText(linkCmd);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-0.5">Telegram bot</p>
+        <p className="text-xs text-muted-foreground/70">
+          Send voice notes to the bot and they'll appear in your dashboard. Each user links their own Telegram account.
+        </p>
+      </div>
+
+      {step === "idle" || step === "loading" || step === "error" ? (
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={step === "loading"}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary border border-border text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
+        >
+          <Send className="w-3.5 h-3.5" />
+          {step === "loading" ? "Generating…" : "Link my Telegram"}
+        </button>
+      ) : null}
+
+      {step === "error" && (
+        <p className="text-xs text-destructive">Failed to generate link. Try again.</p>
+      )}
+
+      {step === "done" && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Open your Telegram bot and send this command (expires in 15 min):
+          </p>
+          <div className="flex gap-2">
+            <code className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-xs font-mono text-foreground truncate">
+              {linkCmd}
+            </code>
+            <button
+              type="button"
+              onClick={copyCmd}
+              className="px-3 py-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setStep("idle"); setLinkCmd(""); }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Generate new code
+          </button>
+        </div>
+      )}
     </div>
   );
 }
