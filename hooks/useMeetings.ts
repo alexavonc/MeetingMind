@@ -153,7 +153,17 @@ export function useMeetings() {
   const updateSettings = useCallback((s: Settings) => {
     setSettings(s);
     saveSettings(s);
-  }, []);
+    // Sync API keys to Supabase so the Telegram bot can use them
+    if (userId) {
+      const sb = getSupabase();
+      void sb?.from("user_settings").upsert({
+        user_id: userId,
+        groq_api_key: s.whisperKey || null,
+        anthropic_api_key: s.claudeKey || null,
+        transcription_provider: s.transcriptionProvider,
+      });
+    }
+  }, [userId]);
 
   const toggleAction = useCallback((meetingId: string, actionIndex: number) => {
     setMeetings((prev) => {

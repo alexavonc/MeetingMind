@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MeetingMind — Setup Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --violet: #6d28d9;
+    --violet-light: #ede9fe;
+    --violet-mid: #8b5cf6;
+    --green: #059669;
+    --green-light: #d1fae5;
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-600: #4b5563;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--gray-800);
+    background: white;
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 40px 48px;
+  }
+
+  /* ── Cover ──────────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 60%, #6d28d9 100%);
+    border-radius: 16px;
+    padding: 44px 40px 36px;
+    color: white;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .cover-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 10px;
+  }
+  .cover h1 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 10px;
+  }
+  .cover p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 20px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 99px;
+    padding: 4px 12px 4px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.9);
+  }
+  .badge-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #34d399;
+  }
+
+  /* ── Sections ───────────────────────────────────────────── */
+  .section {
+    margin-bottom: 36px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1.5px solid var(--gray-200);
+  }
+  .section-number {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--violet);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-number.green { background: var(--green); }
+  .section-number.amber { background: var(--amber); }
+  .section h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+  .section-sub {
+    font-size: 11px;
+    color: var(--gray-400);
+    font-weight: 400;
+    margin-left: 4px;
+  }
+
+  /* ── Steps ──────────────────────────────────────────────── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-left: 4px;
+  }
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--gray-100);
+    border: 1.5px solid var(--gray-200);
+    color: var(--gray-600);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; }
+  .step-body strong { font-weight: 600; color: var(--gray-900); }
+  .step-body .url {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: var(--violet);
+    margin-top: 3px;
+  }
+  .step-body .note {
+    font-size: 11px;
+    color: var(--gray-400);
+    margin-top: 2px;
+  }
+  .step-body .key-example {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: #faf5ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 6px;
+    padding: 2px 9px;
+    color: var(--violet);
+    margin-top: 3px;
+  }
+
+  /* ── Callout boxes ──────────────────────────────────────── */
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin: 14px 0;
+  }
+  .callout.green { background: var(--green-light); border-left: 3px solid var(--green); }
+  .callout.amber { background: var(--amber-light); border-left: 3px solid var(--amber); }
+  .callout.violet { background: var(--violet-light); border-left: 3px solid var(--violet-mid); }
+  .callout-icon { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+  .callout-body { font-size: 11.5px; line-height: 1.55; }
+  .callout-body strong { font-weight: 600; display: block; margin-bottom: 2px; }
+
+  /* ── Settings screenshot mockup ─────────────────────────── */
+  .modal-mock {
+    border: 1.5px solid var(--gray-200);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .modal-mock-header {
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-mock-header span { font-weight: 600; font-size: 12px; color: var(--gray-800); }
+  .modal-mock-header .close { color: var(--gray-400); font-size: 14px; }
+  .modal-mock-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .field-label { font-size: 10px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .field-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 7px 12px;
+    background: white;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gray-400);
+  }
+  .field-input.filled { border-color: #a78bfa; color: var(--violet); background: #faf5ff; }
+  .field-input .dots { letter-spacing: 2px; }
+  .provider-row {
+    display: flex;
+    gap: 4px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .provider-btn {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--gray-400);
+  }
+  .provider-btn.active {
+    background: white;
+    color: var(--gray-900);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .save-btn {
+    align-self: flex-end;
+    background: var(--violet);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ── Telegram section ───────────────────────────────────── */
+  .telegram-card {
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tg-cmd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: white;
+    border: 1.5px solid #ddd6fe;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-top: 10px;
+  }
+  .tg-cmd code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--violet);
+    flex: 1;
+  }
+  .tg-cmd .copy-hint { font-size: 10px; color: var(--gray-400); }
+
+  /* ── Summary table ──────────────────────────────────────── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .summary-table th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-400);
+    padding: 6px 10px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .summary-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: top;
+  }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .tag.free { background: var(--green-light); color: var(--green); }
+  .tag.paid { background: var(--amber-light); color: var(--amber); }
+
+  /* ── Footer ─────────────────────────────────────────────── */
+  footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--gray-400);
+  }
+  footer strong { color: var(--gray-600); }
+
+  /* ── Print styles ───────────────────────────────────────── */
+  @media print {
+    body { padding: 0; max-width: 100%; font-size: 12px; }
+    .cover { border-radius: 0 0 16px 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .callout, .modal-mock, .provider-btn.active, .summary-table th, .tag {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cover -->
+<div class="cover">
+  <div class="cover-label">MeetingMind · Internal Guide</div>
+  <h1>Getting Started</h1>
+  <p>Set up your API keys in under 5 minutes and start turning voice notes into structured meeting summaries.</p>
+  <div class="cover-badge">
+    <div class="badge-dot"></div>
+    Your keys · Your costs · Your data
+  </div>
+</div>
+
+<!-- What you need -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number" style="background:#374151">→</div>
+    <h2>What you need <span class="section-sub">2 API keys, both free to start</span></h2>
+  </div>
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>What it's used for</th>
+        <th>Free tier</th>
+        <th>Where to get it</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Groq</strong></td>
+        <td>Transcribes your audio (speech → text)</td>
+        <td><span class="tag free">Free</span></td>
+        <td>console.groq.com</td>
+      </tr>
+      <tr>
+        <td><strong>Anthropic</strong></td>
+        <td>Summarises, identifies speakers &amp; action items</td>
+        <td><span class="tag paid">Pay as you go</span></td>
+        <td>console.anthropic.com</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout green" style="margin-top:14px">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <strong>Typical cost per meeting</strong>
+      A 30-minute meeting costs roughly $0.02–0.05 in Anthropic credits. Groq transcription is free on the standard tier. You'll only be charged for what you actually use — there are no subscriptions.
+    </div>
+  </div>
+</div>
+
+<!-- Step 1: Groq -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>Get your Groq API Key <span class="section-sub">free · takes ~2 min</span></h2>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        Open your browser and go to:<br>
+        <span class="url">https://console.groq.com</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Sign up</strong> with Google or email. No credit card required.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        In the left sidebar, click <strong>API Keys</strong>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        Click <strong>Create API Key</strong>. Give it any name (e.g. "MeetingMind").
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        Copy the key — it looks like this:<br>
+        <span class="key-example">gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx</span><br>
+        <span class="note">⚠ Copy it now — it won't be shown again after you close the dialog.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: Anthropic -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number green">2</div>
+    <h2>Get your Anthropic API Key <span class="section-sub">pay-as-you-go · ~$5 credit to start</span></h2>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        Open your browser and go to:<br>
+        <span class="url">https://console.anthropic.com</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Sign up</strong> with Google or email.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        You'll be asked to add a payment method and load credits. <strong>$5 is more than enough</strong> for hundreds of meetings.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        In the left sidebar, click <strong>API Keys</strong>, then <strong>Create Key</strong>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        Copy the key — it looks like this:<br>
+        <span class="key-example">sk-ant-api03-xxxxxxxxxxxxxxxxxxxx</span><br>
+        <span class="note">⚠ Copy it now — it won't be shown again after you close the dialog.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout amber">
+    <div class="callout-icon">⚠️</div>
+    <div class="callout-body">
+      <strong>Keep your keys private</strong>
+      Never share your API keys with anyone or post them anywhere. They are linked to your billing account. MeetingMind stores them only in your own browser and your private account — no one else can see them.
+    </div>
+  </div>
+</div>
+
+<!-- Step 3: Add to MeetingMind -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number amber">3</div>
+    <h2>Add your keys to MeetingMind <span class="section-sub">one-time setup</span></h2>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        Open MeetingMind and sign in with Google.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        Click <strong>Settings</strong> (gear icon at the bottom of the left sidebar).
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        Paste your keys into the correct fields and make sure <strong>Groq</strong> is selected as the transcription provider.
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        Click <strong>Save</strong>. Your keys are stored privately — they're never visible to anyone else.
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal mockup -->
+  <div class="modal-mock">
+    <div class="modal-mock-header">
+      <span>Settings</span>
+      <span class="close">✕</span>
+    </div>
+    <div class="modal-mock-body">
+      <div>
+        <div class="field-label">Anthropic Claude API Key</div>
+        <div class="field-input filled">
+          <span>sk-ant-api03-</span><span class="dots">••••••••••••••••••</span>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Transcription provider</div>
+        <div class="provider-row">
+          <div class="provider-btn active">Groq</div>
+          <div class="provider-btn">OpenAI</div>
+          <div class="provider-btn">HF Singlish</div>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Groq API Key</div>
+        <div class="field-input filled">
+          <span>gsk_</span><span class="dots">••••••••••••••••••••••••</span>
+        </div>
+      </div>
+      <button class="save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4: Telegram (optional) -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-number" style="background:#0088cc">4</div>
+    <h2>Link your Telegram <span class="section-sub">optional · send voice notes on the go</span></h2>
+  </div>
+
+  <p style="font-size:12px; color: var(--gray-600); margin-bottom:14px;">
+    If you want to send voice notes directly from Telegram and have them automatically appear in your MeetingMind dashboard, follow these steps.
+  </p>
+
+  <div class="telegram-card">
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">In MeetingMind Settings, scroll to the <strong>Telegram bot</strong> section and click <strong>Link my Telegram</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">A command will appear — copy it (it expires in 15 minutes).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">Open Telegram, search for the bot, and send the command.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">The bot replies <strong>"Account linked!"</strong> — you're done. Send any voice note to process it.</div>
+      </div>
+    </div>
+
+    <div class="tg-cmd">
+      <code>/start a1b2c3d4e5f6g7h8</code>
+      <span class="copy-hint">← example command, yours will differ</span>
+    </div>
+  </div>
+
+  <div class="callout violet" style="margin-top:14px">
+    <div class="callout-icon">🔗</div>
+    <div class="callout-body">
+      <strong>Your keys, your cost</strong>
+      Once linked, the Telegram bot uses <em>your</em> Groq and Anthropic keys for every voice note you send. You are only charged for your own usage.
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <span><strong>MeetingMind</strong> · Internal setup guide</span>
+  <span>Questions? Reach out to the admin who shared this link.</span>
+</footer>
+
+</body>
+</html>

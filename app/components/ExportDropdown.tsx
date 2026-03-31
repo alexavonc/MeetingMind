@@ -17,13 +17,11 @@ function safeName(title: string) {
 
 interface Props {
   meeting: Meeting;
-  activeTab: string;
-  setActiveTab: (tab: "transcript" | "summary" | "flowchart") => void;
   onShare: () => Promise<string>;
   iconOnly?: boolean;
 }
 
-export default function ExportDropdown({ meeting, activeTab, setActiveTab, onShare, iconOnly = false }: Props) {
+export default function ExportDropdown({ meeting, onShare, iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied">("idle");
@@ -44,15 +42,9 @@ export default function ExportDropdown({ meeting, activeTab, setActiveTab, onSha
     setOpen(false);
     setPdfLoading(true);
 
-    // Temporarily switch to flowchart tab so React Flow is rendered for capture
-    const prevTab = activeTab as "transcript" | "summary" | "flowchart";
-    const needSwitch = prevTab !== "flowchart";
-
     try {
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas"),
-      ]);
+      const { default: jsPDF } = await import("jspdf");
+      const Dagre = await import("@dagrejs/dagre");
 
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const W = 210, H = 297, M = 18;
@@ -164,58 +156,108 @@ export default function ExportDropdown({ meeting, activeTab, setActiveTab, onSha
         y += 3;
       });
 
-      // ── Flowchart ─────────────────────────────────────────────────────────
+      // ── Flowchart (drawn natively with jsPDF + Dagre — no DOM capture) ────
       if (meeting.flow) {
-        if (needSwitch) setActiveTab("flowchart");
+        try {
+          const raw = JSON.parse(meeting.flow) as {
+            nodes: { id: string; label: string; type?: string }[];
+            edges: { source: string; target: string; label?: string }[];
+          };
+          if (raw.nodes?.length) {
+            const NODE_W = 155, NODE_H = 42;
+            const g = new Dagre.default.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+            g.setGraph({ rankdir: "TB", ranksep: 52, nodesep: 42 });
+            raw.nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
+            raw.edges.forEach((e) => g.setEdge(e.source, e.target));
+            Dagre.default.layout(g);
 
-        // Poll until React Flow is in the DOM (up to 2.5 s)
-        const flowEl = await new Promise<HTMLElement | null>((resolve) => {
-          const deadline = Date.now() + 2500;
-          function check() {
-            const el = document.querySelector(".react-flow") as HTMLElement | null;
-            if (el) return resolve(el);
-            if (Date.now() > deadline) return resolve(null);
-            setTimeout(check, 80);
-          }
-          check();
-        });
-
-        if (flowEl) {
-          try {
-            // Scroll element into view so html2canvas can capture it
-            flowEl.scrollIntoView({ block: "nearest" });
-            await new Promise((r) => requestAnimationFrame(r));
-            await new Promise((r) => setTimeout(r, 200));
-
-            const canvas = await html2canvas(flowEl, {
-              backgroundColor: "#ffffff",
-              scale: 1.5,
-              logging: false,
-              useCORS: true,
-              allowTaint: true,
-              foreignObjectRendering: false,
-              windowWidth: flowEl.scrollWidth,
-              windowHeight: flowEl.scrollHeight,
+            // Bounding box of the graph
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            raw.nodes.forEach((n) => {
+              const p = g.node(n.id);
+              minX = Math.min(minX, p.x - NODE_W / 2);
+              maxX = Math.max(maxX, p.x + NODE_W / 2);
+              minY = Math.min(minY, p.y - NODE_H / 2);
+              maxY = Math.max(maxY, p.y + NODE_H / 2);
             });
-            const imgData = canvas.toDataURL("image/png");
-            const imgH = Math.min((canvas.height / canvas.width) * CW, H - 2 * M - 20);
+
+            const graphW = maxX - minX;
+            const graphH = maxY - minY;
+            // Scale to fit the content width; cap height at two-thirds of the page body
+            const scale = Math.min(CW / graphW, (H - 2 * M - 40) * 0.65 / graphH);
+            const drawW = graphW * scale;
+            const drawH = graphH * scale;
+
             pdf.addPage();
             y = M;
             sectionHeading("Flowchart");
-            newPageIfNeeded(imgH);
-            pdf.addImage(imgData, "PNG", M, y, CW, imgH);
-          } catch {
-            // Capture failed — skip silently
-          }
-        }
 
-        if (needSwitch) setActiveTab(prevTab);
+            const ox = M + (CW - drawW) / 2; // centre horizontally
+            const oy = y;
+
+            const toX = (px: number) => ox + (px - minX) * scale;
+            const toY = (py: number) => oy + (py - minY) * scale;
+
+            // Draw edges
+            raw.edges.forEach((e) => {
+              const src = g.node(e.source);
+              const tgt = g.node(e.target);
+              if (!src || !tgt) return;
+              const x1 = toX(src.x), y1 = toY(src.y + NODE_H / 2);
+              const x2 = toX(tgt.x), y2 = toY(tgt.y - NODE_H / 2);
+              pdf.setDrawColor(180, 150, 230);
+              pdf.setLineWidth(0.35);
+              pdf.line(x1, y1, x2, y2);
+              // Arrowhead
+              const ang = Math.atan2(y2 - y1, x2 - x1);
+              const aw = 1.8;
+              pdf.line(x2, y2, x2 - aw * Math.cos(ang - 0.45), y2 - aw * Math.sin(ang - 0.45));
+              pdf.line(x2, y2, x2 - aw * Math.cos(ang + 0.45), y2 - aw * Math.sin(ang + 0.45));
+              // Edge label
+              if (e.label) {
+                pdf.setFontSize(6.5);
+                pdf.setTextColor(130, 100, 190);
+                pdf.text(e.label, (x1 + x2) / 2, (y1 + y2) / 2 - 1, { align: "center" });
+              }
+            });
+
+            // Draw nodes
+            raw.nodes.forEach((n) => {
+              const pos = g.node(n.id);
+              if (!pos) return;
+              const nx = toX(pos.x - NODE_W / 2);
+              const ny = toY(pos.y - NODE_H / 2);
+              const nw = NODE_W * scale;
+              const nh = NODE_H * scale;
+              // Fill + border colour by type
+              if (n.type === "start")         { pdf.setFillColor(237, 233, 254); pdf.setDrawColor(139, 92, 246); }
+              else if (n.type === "end")      { pdf.setFillColor(209, 250, 229); pdf.setDrawColor(52, 211, 153); }
+              else if (n.type === "decision") { pdf.setFillColor(254, 249, 195); pdf.setDrawColor(234, 179, 8); }
+              else                            { pdf.setFillColor(248, 250, 252); pdf.setDrawColor(200, 200, 215); }
+              pdf.setLineWidth(0.3);
+              pdf.roundedRect(nx, ny, nw, nh, 2, 2, "FD");
+              // Label
+              pdf.setFontSize(7.5);
+              pdf.setFont("helvetica", "bold");
+              pdf.setTextColor(45, 25, 75);
+              const lines = pdf.splitTextToSize(n.label, nw - 4) as string[];
+              const lh = 3.4;
+              const totalTH = lines.length * lh;
+              lines.forEach((line, li) => {
+                pdf.text(line, nx + nw / 2, ny + (nh - totalTH) / 2 + (li + 0.85) * lh, { align: "center" });
+              });
+            });
+
+            y = oy + drawH + 10;
+          }
+        } catch {
+          // Skip flowchart if JSON is malformed
+        }
       }
 
       pdf.save(`${safeName(meeting.title)}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
-      if (needSwitch) setActiveTab(prevTab);
     } finally {
       setPdfLoading(false);
     }

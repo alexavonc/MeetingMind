@@ -148,10 +148,26 @@ async function resolveUserId(chatId: number): Promise<string | null> {
   return data?.user_id ?? null;
 }
 
+/** Fetch the API keys a user has saved in their MeetingMind settings. */
+async function getUserApiKeys(userId: string): Promise<{ groqKey?: string; anthropicKey?: string } | null> {
+  const sb = getServerSupabase();
+  if (!sb) return null;
+  const { data } = await sb
+    .from("user_settings")
+    .select("groq_api_key, anthropic_api_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    groqKey: data.groq_api_key ?? undefined,
+    anthropicKey: data.anthropic_api_key ?? undefined,
+  };
+}
+
 export async function POST(req: NextRequest) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const groqKey = process.env.GROQ_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  let groqKey = process.env.GROQ_API_KEY;
+  let anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   if (!token) return NextResponse.json({ ok: true }); // silently ignore if not configured
 
@@ -224,11 +240,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Prefer the linked user's own API keys; fall back to server env vars
+  const linkedUserId = await resolveUserId(chatId);
+  if (linkedUserId) {
+    const userKeys = await getUserApiKeys(linkedUserId);
+    if (userKeys?.groqKey) groqKey = userKeys.groqKey;
+    if (userKeys?.anthropicKey) anthropicKey = userKeys.anthropicKey;
+  }
+
   if (!groqKey || !anthropicKey) {
     await tgSend(
       token,
       chatId,
-      "❌ Bot not fully configured — set <code>GROQ_API_KEY</code> and <code>ANTHROPIC_API_KEY</code> in Railway Variables."
+      "❌ No API keys found. Please add your Groq and Anthropic keys in MeetingMind Settings, or ask the admin to configure server-side keys."
     );
     return NextResponse.json({ ok: true });
   }
@@ -345,8 +369,6 @@ DISCUSSION: ${excerpts}`;
     };
     const sb = getServerSupabase();
     if (sb) {
-      // Use the linked user's ID if available, otherwise fall back to ADMIN_USER_ID
-      const linkedUserId = await resolveUserId(chatId);
       const userId = linkedUserId ?? process.env.ADMIN_USER_ID;
       const row = userId ? { ...meeting, user_id: userId } : meeting;
       await sb.from("meetings").upsert(row);
