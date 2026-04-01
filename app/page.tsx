@@ -113,6 +113,7 @@ export default function Home() {
     deleteMeeting,
     generateShareLink,
     regenerateFlow,
+    processNotes,
     processUpload,
   } = useMeetings();
   const [activeTab, setActiveTab] = useState<Tab>("transcript");
@@ -390,6 +391,7 @@ export default function Home() {
         onClose={() => setUploadOpen(false)}
         processing={processing}
         onSubmit={handleProcessUpload}
+        onSubmitNotes={async (notes, title, folder) => { await processNotes(notes, title, folder); }}
         folders={folders}
       />
 
