@@ -5,7 +5,7 @@ import type { Meeting, Settings, Folder, ProcessingState } from "@/types";
 import { loadDB, saveDB, loadSettings, saveSettings } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
 import { SEED_MEETINGS } from "@/lib/seeds";
-import { diarise, summarise, genFlow } from "@/lib/claude";
+import { diarise, summarise, genFlow, notesToMeeting } from "@/lib/claude";
 import { transcribeAudio } from "@/lib/whisper";
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -390,6 +390,59 @@ export function useMeetings() {
     });
   }, [meetings]);
 
+  const processNotes = useCallback(
+    async (notes: string, title: string, folder: Folder) => {
+      if (!settings.claudeKey) throw new Error("Claude API key not set");
+      setProcessing({ active: true, step: "summarising", error: null });
+      try {
+        const { summary, actions, flow } = await notesToMeeting(
+          settings.claudeKey, notes, title
+        );
+        setProcessing({ active: true, step: "saving", error: null });
+
+        // Convert notes lines into a minimal transcript for display
+        const lines = notes.split("\n").filter((l) => l.trim());
+        const transcript = lines.map((line, i) => ({
+          s: "A",
+          t: `${i}:00`,
+          text: line.replace(/^[\s•\-*]+/, "").trim(),
+        })).filter((u) => u.text);
+
+        const meetingId = `meeting-${Date.now()}`;
+        const newMeeting: Meeting = {
+          id: meetingId,
+          title,
+          folder,
+          date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+          duration: `${Math.ceil(lines.length * 0.1)} min`,
+          languages: ["en"],
+          speakers: { A: "Notes" },
+          transcript,
+          summary,
+          actions,
+          flow,
+        };
+
+        setMeetings((prev) => {
+          const updated = [newMeeting, ...prev];
+          saveDB(updated);
+          return updated;
+        });
+        await dbUpsert(newMeeting, userId ?? undefined);
+
+        setSelectedFolder(folder);
+        setSelectedId(newMeeting.id);
+        setProcessing({ active: false, step: "done", error: null });
+        return newMeeting;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        setProcessing({ active: false, step: "error", error: msg });
+        throw err;
+      }
+    },
+    [settings, userId]
+  );
+
   const processUpload = useCallback(
     async (input: File | File[] | string, title: string, folder: Folder) => {
       if (!settings.claudeKey) throw new Error("Claude API key not set");
@@ -519,6 +572,7 @@ export function useMeetings() {
     deleteMeeting,
     generateShareLink,
     regenerateFlow,
+    processNotes,
     processUpload,
   };
 }

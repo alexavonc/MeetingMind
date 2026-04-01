@@ -101,6 +101,59 @@ ${text}`;
   }
 }
 
+interface NotesResult {
+  summary: string;
+  actions: Action[];
+  flow: string;
+}
+
+/**
+ * Convert structured text notes (bullet points, headers, etc.) directly into
+ * a meeting summary, action items, and flowchart — in a single Claude call.
+ */
+export async function notesToMeeting(
+  apiKey: string,
+  notes: string,
+  title: string
+): Promise<NotesResult> {
+  const prompt = `You are given structured notes (may contain bullet points, numbered lists, headers, indented sub-items).
+Convert them into a meeting record. Return ONLY valid JSON (no backticks, no markdown):
+{
+  "summary": "2-3 sentence overview of the content",
+  "actions": [{"text": "specific action", "owner": "person or empty string", "done": false}],
+  "flow": {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
+}
+
+Rules for actions:
+- Max 6 items. Only include concrete tasks or decisions. Skip if none.
+
+Rules for flowchart:
+- 6–12 nodes, labels max 5 words
+- CRITICALLY: honour the hierarchy of the notes. If a bullet point has sub-bullets A, B, C, the parent node must be the SOURCE of SEPARATE edges to A, B, and C — never a chain A→B→C unless the text is genuinely sequential
+- Top-level sections / headers → "step" or "start" nodes
+- Branching choices → "decision" nodes with labelled edges
+- Final outcomes / conclusions → "end" nodes
+- If the notes enumerate a list under a heading, fan out from that heading node to each list item in parallel
+
+TITLE: ${title}
+NOTES:
+${notes}`;
+
+  const raw = await callClaude(apiKey, prompt, 2048);
+  let parsed: { summary: string; actions: Action[]; flow: unknown };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    throw new Error("Failed to parse notes response as JSON");
+  }
+  const flowStr = typeof parsed.flow === "string"
+    ? parsed.flow
+    : JSON.stringify(parsed.flow);
+  // Validate flowchart JSON
+  JSON.parse(flowStr);
+  return { summary: parsed.summary, actions: parsed.actions, flow: flowStr };
+}
+
 export async function genFlow(
   apiKey: string,
   meeting: Pick<Meeting, "title" | "summary" | "transcript" | "speakers">

@@ -11,17 +11,41 @@ interface Props {
   onClose: () => void;
   processing: ProcessingState;
   onSubmit: (input: File | File[] | string, title: string, folder: Folder) => Promise<void>;
+  onSubmitNotes: (notes: string, title: string, folder: Folder) => Promise<void>;
   folders: string[];
 }
 
-type Mode = "audio" | "text";
+type Mode = "audio" | "text" | "notes";
 
-export default function UploadModal({ open, onClose, processing, onSubmit, folders }: Props) {
+const NOTES_PLACEHOLDER = `e.g.
+
+Project Kickoff — Q3 Launch
+
+Goals
+• Ship mobile app by end of Q3
+• Improve onboarding conversion by 20%
+• Reduce support tickets
+
+Blockers
+• Design assets not finalised
+• API integration still pending — Alice to unblock by Friday
+
+Decisions
+• Go with Option B for the nav structure
+• Defer dark mode to Q4
+
+Next Steps
+• Alice — finalise design assets by Fri 18 Jul
+• Bob — complete API docs and share with team
+• Everyone — review PRD and add comments by EOD Wed`;
+
+export default function UploadModal({ open, onClose, processing, onSubmit, onSubmitNotes, folders }: Props) {
   const [mode, setMode] = useState<Mode>("audio");
   const [title, setTitle] = useState("");
   const [folder, setFolder] = useState<Folder>("personal");
   const [files, setFiles] = useState<File[]>([]);
   const [rawText, setRawText] = useState("");
+  const [notes, setNotes] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -29,16 +53,24 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
 
   const canSubmit =
     title.trim() &&
-    (mode === "audio" ? files.length > 0 : rawText.trim().length > 50) &&
-    !processing.active;
+    !processing.active &&
+    (mode === "audio"
+      ? files.length > 0
+      : mode === "notes"
+      ? notes.trim().length > 20
+      : rawText.trim().length > 50);
 
   async function handleSubmit() {
     if (!canSubmit) return;
     try {
-      const input = mode === "audio"
-        ? (files.length === 1 ? files[0] : files)
-        : rawText;
-      await onSubmit(input, title.trim(), folder);
+      if (mode === "notes") {
+        await onSubmitNotes(notes, title.trim(), folder);
+      } else {
+        const input = mode === "audio"
+          ? (files.length === 1 ? files[0] : files)
+          : rawText;
+        await onSubmit(input, title.trim(), folder);
+      }
       if (!processing.error) {
         reset();
         onClose();
@@ -52,6 +84,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
     setTitle("");
     setFiles([]);
     setRawText("");
+    setNotes("");
     setMode("audio");
   }
 
@@ -75,6 +108,13 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
   }
 
   const totalMB = files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+
+  const submitLabel =
+    mode === "notes"
+      ? "Generate flowchart"
+      : files.length > 1
+      ? `Process ${files.length} parts`
+      : "Process meeting";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
@@ -132,7 +172,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
 
               {/* Mode toggle */}
               <div className="flex rounded-lg bg-secondary p-1 gap-1">
-                {(["audio", "text"] as Mode[]).map((m) => (
+                {(["audio", "text", "notes"] as Mode[]).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -143,7 +183,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {m === "audio" ? "Audio file(s)" : "Paste transcript"}
+                    {m === "audio" ? "Audio" : m === "text" ? "Transcript" : "Notes"}
                   </button>
                 ))}
               </div>
@@ -177,48 +217,30 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
                     </p>
                   </div>
 
-                  {/* File list */}
                   {files.length > 0 && (
                     <div className="space-y-1.5">
                       {files.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/50 border border-border"
-                        >
-                          <span className="text-xs text-muted-foreground w-5 text-center flex-shrink-0 font-mono">
-                            {i + 1}
-                          </span>
+                        <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/50 border border-border">
+                          <span className="text-xs text-muted-foreground w-5 text-center flex-shrink-0 font-mono">{i + 1}</span>
                           <FileAudio className="w-4 h-4 text-primary flex-shrink-0" />
                           <span className="flex-1 text-sm text-foreground truncate">{f.name}</span>
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {(f.size / 1024 / 1024).toFixed(1)} MB
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                            className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                          >
+                          <span className="text-xs text-muted-foreground flex-shrink-0">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ))}
                       <div className="flex items-center justify-between px-1">
-                        <button
-                          type="button"
-                          onClick={() => fileRef.current?.click()}
-                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                        >
+                        <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors">
                           <Plus className="w-3 h-3" />
                           Add more
                         </button>
-                        <span className="text-xs text-muted-foreground">
-                          {files.length} file{files.length > 1 ? "s" : ""} · {totalMB.toFixed(1)} MB total
-                        </span>
+                        <span className="text-xs text-muted-foreground">{files.length} file{files.length > 1 ? "s" : ""} · {totalMB.toFixed(1)} MB total</span>
                       </div>
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : mode === "text" ? (
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
@@ -228,6 +250,21 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
                     placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring
                     resize-none font-mono"
                 />
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Paste bullet-point notes, agendas, or any structured text. Claude will generate a summary, action items, and a flowchart that mirrors your structure.
+                  </p>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={NOTES_PLACEHOLDER}
+                    rows={10}
+                    className="w-full px-3 py-2.5 rounded-lg bg-input border border-border text-sm text-foreground
+                      placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring
+                      resize-none leading-relaxed"
+                  />
+                </div>
               )}
             </>
           )}
@@ -236,11 +273,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
         {/* Footer */}
         {!processing.active && (
           <div className="px-6 pb-5 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
               Cancel
             </button>
             <button
@@ -250,7 +283,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, folde
               className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground
                 hover:bg-primary/90 transition-colors disabled:opacity-40"
             >
-              {files.length > 1 ? `Process ${files.length} parts` : "Process meeting"}
+              {submitLabel}
             </button>
           </div>
         )}
