@@ -34,49 +34,77 @@ function parseFlow(flow: string): FlowData | null {
 
 const NODE_W = 170;
 const NODE_H = 48;
-const NODE_SEP = 50;
+const NODE_SEP = 40;   // horizontal gap between siblings
+const RANK_SEP = 80;   // vertical gap between levels
 
 function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 60, nodesep: NODE_SEP });
+  // Build child/parent adjacency (preserving JSON edge order for sibling ordering)
+  const childrenOf = new Map<string, string[]>();
+  const parentsOf  = new Map<string, Set<string>>();
+  for (const n of raw.nodes) { childrenOf.set(n.id, []); parentsOf.set(n.id, new Set()); }
+  for (const e of raw.edges) {
+    childrenOf.get(e.source)?.push(e.target);
+    parentsOf.get(e.target)?.add(e.source);
+  }
 
+  // Use Dagre only for y (rank) assignment
+  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "TB", ranksep: RANK_SEP, nodesep: NODE_SEP });
   raw.nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
   raw.edges.forEach((e) => g.setEdge(e.source, e.target));
   Dagre.layout(g);
 
-  // Dagre doesn't preserve insertion order for siblings. Re-sort each rank
-  // by the node's original index so the left→right order matches the JSON order.
-  const originalIndex = new Map(raw.nodes.map((n, i) => [n.id, i]));
-  const dagrePos = new Map(raw.nodes.map((n) => [n.id, g.node(n.id)]));
+  const dagreY = new Map(raw.nodes.map((n) => [n.id, g.node(n.id).y]));
 
-  // Group nodes into ranks by rounded y position
-  const rankMap = new Map<number, string[]>();
-  for (const n of raw.nodes) {
-    const y = Math.round(dagrePos.get(n.id)!.y);
-    if (!rankMap.has(y)) rankMap.set(y, []);
-    rankMap.get(y)!.push(n.id);
+  // Compute the minimum subtree width needed to lay out each subtree without overlap
+  const subtreeW = new Map<string, number>();
+  function computeSubtreeW(id: string, visited = new Set<string>()): number {
+    if (visited.has(id)) return NODE_W; // cycle guard
+    visited.add(id);
+    const kids = childrenOf.get(id) ?? [];
+    if (kids.length === 0) { subtreeW.set(id, NODE_W); return NODE_W; }
+    const total = kids.reduce((sum, k) => sum + computeSubtreeW(k, visited), 0)
+      + (kids.length - 1) * NODE_SEP;
+    const w = Math.max(NODE_W, total);
+    subtreeW.set(id, w);
+    return w;
   }
 
-  // For each rank, sort by original order, then re-space x positions evenly
-  const adjustedX = new Map<string, number>();
-  for (const ids of rankMap.values()) {
-    ids.sort((a, b) => originalIndex.get(a)! - originalIndex.get(b)!);
-    const totalW = ids.length * NODE_W + (ids.length - 1) * NODE_SEP;
-    // Keep the group centred at the same x centre Dagre computed
-    const xs = ids.map((id) => dagrePos.get(id)!.x);
-    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const startX = centerX - totalW / 2;
-    ids.forEach((id, i) => {
-      adjustedX.set(id, startX + i * (NODE_W + NODE_SEP));
-    });
+  // Roots = nodes with no parents
+  const roots = raw.nodes.filter((n) => parentsOf.get(n.id)!.size === 0).map((n) => n.id);
+  roots.forEach((r) => computeSubtreeW(r));
+
+  // Top-down x assignment: each parent centres itself over its children
+  const nodeX = new Map<string, number>();
+  function assignX(id: string, leftEdge: number, visited = new Set<string>()) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    const w = subtreeW.get(id) ?? NODE_W;
+    nodeX.set(id, leftEdge + w / 2);
+    const kids = childrenOf.get(id) ?? [];
+    let cursor = leftEdge;
+    for (const kid of kids) {
+      assignX(kid, cursor, visited);
+      cursor += (subtreeW.get(kid) ?? NODE_W) + NODE_SEP;
+    }
   }
 
+  let rootCursor = 0;
+  for (const root of roots) {
+    assignX(root, rootCursor);
+    rootCursor += (subtreeW.get(root) ?? NODE_W) + NODE_SEP * 2;
+  }
+
+  // Fall back to Dagre x for any node not reached (disconnected / multi-root DAG)
   const nodes: Node[] = raw.nodes.map((n) => {
-    const pos = dagrePos.get(n.id)!;
+    const dagrePos = g.node(n.id);
     return {
       id: n.id,
       type: "flowNode",
-      position: { x: (adjustedX.get(n.id) ?? pos.x) - NODE_W / 2, y: pos.y - NODE_H / 2 },
+      position: {
+        x: (nodeX.get(n.id) ?? dagrePos.x) - NODE_W / 2,
+        y: dagreY.get(n.id)! - NODE_H / 2,
+      },
       data: { label: n.label, nodeType: n.type ?? "step" },
     };
   });
