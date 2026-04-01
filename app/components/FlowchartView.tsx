@@ -8,11 +8,16 @@ import {
   BackgroundVariant,
   Handle,
   Position,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   useNodesState,
   useEdgesState,
   type Node,
   type Edge,
+  type EdgeProps,
   type NodeTypes,
+  type EdgeTypes,
 } from "@xyflow/react";
 import Dagre from "@dagrejs/dagre";
 import { RefreshCw } from "lucide-react";
@@ -109,18 +114,58 @@ function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } 
     };
   });
 
+  // Only show labels on edges coming from decision nodes — fan-out labels just clutter
+  const decisionIds = new Set(raw.nodes.filter((n) => n.type === "decision").map((n) => n.id));
+
   const edges: Edge[] = raw.edges.map((e, i) => ({
     id: e.id ?? `e-${i}`,
     source: e.source,
     target: e.target,
-    label: e.label,
-    type: "smoothstep",
+    label: decisionIds.has(e.source) ? (e.label ?? "") : "",
+    type: "verticalLabel",
     style: { stroke: "hsl(258 89% 62% / 0.55)", strokeWidth: 1.5 },
-    labelStyle: { fontSize: 10, fill: "#888" },
-    labelBgStyle: { fill: "white", fillOpacity: 0.8 },
   }));
 
   return { nodes, edges };
+}
+
+/** Edge that draws the label on the vertical segment descending into the target node */
+function VerticalLabelEdge({
+  id, sourceX, sourceY, targetX, targetY,
+  sourcePosition, targetPosition, label, style, markerEnd,
+}: EdgeProps) {
+  const [edgePath] = getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  // Midpoint of the smoothstep path is roughly halfway between source and target y
+  const midY = (sourceY + targetY) / 2;
+  // Place label on the lower vertical segment, centred horizontally on the target
+  const labelX = targetX;
+  const labelY = (midY + targetY) / 2;
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan"
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              fontSize: 10,
+              color: "#888",
+              background: "white",
+              padding: "1px 5px",
+              borderRadius: 3,
+              pointerEvents: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label as string}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
 }
 
 function FlowNode({ data }: { data: { label: string; nodeType?: string } }) {
@@ -144,6 +189,7 @@ function FlowNode({ data }: { data: { label: string; nodeType?: string } }) {
 }
 
 const NODE_TYPES: NodeTypes = { flowNode: FlowNode };
+const EDGE_TYPES: EdgeTypes = { verticalLabel: VerticalLabelEdge };
 
 interface Props {
   meeting: Meeting;
@@ -218,6 +264,7 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             nodesDraggable={false}

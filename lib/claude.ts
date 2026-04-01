@@ -176,12 +176,16 @@ YOUR TASK:
 4. Add "end" nodes only for genuine conclusions, decisions made, or next steps.
 5. NEVER chain items sequentially (A→B→C) when they are parallel sub-points of the same parent — they must each connect directly to the parent node.
 
-LABELLING RULES:
+NODE LABELLING RULES:
 - Labels must be CLEAN CONCEPTS (3–5 words), NOT paraphrases of speech
 - Bad: "Young people avoid management" | Good: "Management Role Reluctance"
 - Bad: "Define fractional managers" | Good: "Definition of Fractional"
 - Capitalise main theme nodes. Lowercase for sub-points is fine.
 - Aim for 10–18 nodes total for a rich discussion
+
+EDGE LABEL RULES:
+- ONLY add edge labels on edges coming OUT of "decision" nodes (e.g. "yes", "no", "policy track")
+- NEVER add labels to edges from a parent to its parallel fan-out children — omit the label field entirely for those
 
 MEETING: ${meeting.title}
 SUMMARY: ${meeting.summary}
