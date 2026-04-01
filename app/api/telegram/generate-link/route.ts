@@ -40,15 +40,15 @@ export async function POST(req: NextRequest) {
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-  // Upsert: one pending token per user at a time
-  const { error: upsertError } = await sb.from("telegram_link_tokens").upsert(
-    { token, user_id: user.id, expires_at: expiresAt },
-    { onConflict: "user_id" }
+  // Delete any existing token for this user, then insert a fresh one
+  await sb.from("telegram_link_tokens").delete().eq("user_id", user.id);
+  const { error: insertError } = await sb.from("telegram_link_tokens").insert(
+    { token, user_id: user.id, expires_at: expiresAt }
   );
 
-  if (upsertError) {
-    console.error("telegram_link_tokens upsert failed:", upsertError);
-    return NextResponse.json({ error: `DB error: ${upsertError.message}` }, { status: 500 });
+  if (insertError) {
+    console.error("telegram_link_tokens insert failed:", insertError);
+    return NextResponse.json({ error: `DB error: ${insertError.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ token });
