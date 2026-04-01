@@ -248,10 +248,12 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
 function TelegramLinkSection() {
   const [step, setStep] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [linkCmd, setLinkCmd] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
 
   async function handleGenerate() {
     setStep("loading");
+    setErrorMsg("");
     try {
       const sb = getSupabase();
       const { data: { session } } = await sb!.auth.getSession();
@@ -260,11 +262,12 @@ function TelegramLinkSection() {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (!res.ok) throw new Error("Failed");
-      const { token } = await res.json() as { token: string };
-      setLinkCmd(`/start ${token}`);
+      const json = await res.json() as { token?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      setLinkCmd(`/start ${json.token}`);
       setStep("done");
-    } catch {
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "Unknown error");
       setStep("error");
     }
   }
@@ -297,7 +300,7 @@ function TelegramLinkSection() {
       ) : null}
 
       {step === "error" && (
-        <p className="text-xs text-destructive">Failed to generate link. Try again.</p>
+        <p className="text-xs text-destructive">{errorMsg || "Failed to generate link. Try again."}</p>
       )}
 
       {step === "done" && (
