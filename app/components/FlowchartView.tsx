@@ -32,20 +32,51 @@ function parseFlow(flow: string): FlowData | null {
   }
 }
 
+const NODE_W = 170;
+const NODE_H = 48;
+const NODE_SEP = 50;
+
 function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 60, nodesep: 50 });
+  g.setGraph({ rankdir: "TB", ranksep: 60, nodesep: NODE_SEP });
 
-  raw.nodes.forEach((n) => g.setNode(n.id, { width: 170, height: 48 }));
+  raw.nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
   raw.edges.forEach((e) => g.setEdge(e.source, e.target));
   Dagre.layout(g);
 
+  // Dagre doesn't preserve insertion order for siblings. Re-sort each rank
+  // by the node's original index so the left→right order matches the JSON order.
+  const originalIndex = new Map(raw.nodes.map((n, i) => [n.id, i]));
+  const dagrePos = new Map(raw.nodes.map((n) => [n.id, g.node(n.id)]));
+
+  // Group nodes into ranks by rounded y position
+  const rankMap = new Map<number, string[]>();
+  for (const n of raw.nodes) {
+    const y = Math.round(dagrePos.get(n.id)!.y);
+    if (!rankMap.has(y)) rankMap.set(y, []);
+    rankMap.get(y)!.push(n.id);
+  }
+
+  // For each rank, sort by original order, then re-space x positions evenly
+  const adjustedX = new Map<string, number>();
+  for (const ids of rankMap.values()) {
+    ids.sort((a, b) => originalIndex.get(a)! - originalIndex.get(b)!);
+    const totalW = ids.length * NODE_W + (ids.length - 1) * NODE_SEP;
+    // Keep the group centred at the same x centre Dagre computed
+    const xs = ids.map((id) => dagrePos.get(id)!.x);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const startX = centerX - totalW / 2;
+    ids.forEach((id, i) => {
+      adjustedX.set(id, startX + i * (NODE_W + NODE_SEP));
+    });
+  }
+
   const nodes: Node[] = raw.nodes.map((n) => {
-    const pos = g.node(n.id);
+    const pos = dagrePos.get(n.id)!;
     return {
       id: n.id,
       type: "flowNode",
-      position: { x: pos.x - 85, y: pos.y - 24 },
+      position: { x: (adjustedX.get(n.id) ?? pos.x) - NODE_W / 2, y: pos.y - NODE_H / 2 },
       data: { label: n.label, nodeType: n.type ?? "step" },
     };
   });
