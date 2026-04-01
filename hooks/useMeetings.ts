@@ -392,9 +392,9 @@ export function useMeetings() {
 
   const processNotes = useCallback(
     async (notes: string, title: string, folder: Folder) => {
-      if (!settings.claudeKey) throw new Error("Claude API key not set");
       setProcessing({ active: true, step: "summarising", error: null });
       try {
+        if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
         const { summary, actions, flow } = await notesToMeeting(
           settings.claudeKey, notes, title
         );
@@ -445,10 +445,9 @@ export function useMeetings() {
 
   const processUpload = useCallback(
     async (input: File | File[] | string, title: string, folder: Folder) => {
-      if (!settings.claudeKey) throw new Error("Claude API key not set");
       setProcessing({ active: true, step: "transcribing", error: null });
-
       try {
+        if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
         let raw: string;
         if (typeof input === "string") {
           raw = input;
