@@ -158,31 +158,37 @@ export async function genFlow(
   apiKey: string,
   meeting: Pick<Meeting, "title" | "summary" | "transcript" | "speakers">
 ): Promise<string> {
-  const excerpts = meeting.transcript
-    .slice(0, 20)
+  const fullTranscript = meeting.transcript
     .map((u) => `${meeting.speakers[u.s] ?? u.s}: ${u.text}`)
     .join("\n");
 
-  const prompt = `Generate a flowchart for this meeting as JSON. Return ONLY valid JSON — no backticks, no markdown, no explanation.
+  const prompt = `You are building a MIND MAP (not a flowchart) for a meeting discussion. Return ONLY valid JSON — no backticks, no markdown, no explanation.
 
 Format:
 {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
 
-Node types: "start" (opening context), "end" (outcome or next step), "decision" (branch point), "step" (default)
-Rules:
-- 6–12 nodes
-- Labels max 5 words each
-- When content enumerates multiple items under a parent (e.g. "three rules: A, B, C"), the parent node must appear as the "source" in SEPARATE edges to each child — NOT a chain (A→B→C). Example: {"source":"rules","target":"ruleA"},{"source":"rules","target":"ruleB"},{"source":"rules","target":"ruleC"}
-- Use "decision" nodes when there is a genuine yes/no or multiple-choice point; label each outgoing edge
-- Linear chains are fine when steps are genuinely sequential
-- Multiple "end" nodes are fine if there are distinct outcomes
+Node types: "start" (the overall meeting topic — root node), "step" (main theme or sub-point), "end" (key conclusion or outcome), "decision" (a genuine question or fork in the discussion)
+
+YOUR TASK:
+1. Identify the overall topic → make it the single root "start" node
+2. Identify the 2–5 MAIN THEMES or sections of the discussion (e.g. if a speaker says "three things: first X, second Y, third Z" — those ARE your main theme nodes). Connect each directly to the root.
+3. Under each main theme, add 1–3 specific insight/sub-point nodes with the key idea captured concisely. Connect them to their parent theme node.
+4. Add "end" nodes only for genuine conclusions, decisions made, or next steps.
+5. NEVER chain items sequentially (A→B→C) when they are parallel sub-points of the same parent — they must each connect directly to the parent node.
+
+LABELLING RULES:
+- Labels must be CLEAN CONCEPTS (3–5 words), NOT paraphrases of speech
+- Bad: "Young people avoid management" | Good: "Management Role Reluctance"
+- Bad: "Define fractional managers" | Good: "Definition of Fractional"
+- Capitalise main theme nodes. Lowercase for sub-points is fine.
+- Aim for 10–18 nodes total for a rich discussion
 
 MEETING: ${meeting.title}
 SUMMARY: ${meeting.summary}
-DISCUSSION EXCERPT:
-${excerpts}`;
+FULL TRANSCRIPT:
+${fullTranscript}`;
 
-  const raw = await callClaude(apiKey, prompt, 1024);
+  const raw = await callClaude(apiKey, prompt, 2048);
   const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
   JSON.parse(cleaned); // validate — throws if Claude returned garbage
   return cleaned;
