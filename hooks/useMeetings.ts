@@ -150,10 +150,36 @@ export function useMeetings() {
     saveDB(updated); // keep localStorage in sync as fallback
   }, []);
 
+  // Load API keys from Supabase when user signs in (overrides localStorage for keys only)
+  useEffect(() => {
+    if (!userId) return;
+    const sb = getSupabase();
+    if (!sb) return;
+    sb.from("user_settings")
+      .select("groq_api_key,anthropic_api_key,transcription_provider,hf_token,hf_endpoint_url")
+      .eq("user_id", userId)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setSettings((prev) => {
+          const updated: Settings = {
+            ...prev,
+            ...(data.groq_api_key ? { whisperKey: data.groq_api_key } : {}),
+            ...(data.anthropic_api_key ? { claudeKey: data.anthropic_api_key } : {}),
+            ...(data.transcription_provider ? { transcriptionProvider: data.transcription_provider } : {}),
+            ...(data.hf_token ? { hfToken: data.hf_token } : {}),
+            ...(data.hf_endpoint_url ? { hfEndpointUrl: data.hf_endpoint_url } : {}),
+          };
+          saveSettings(updated);
+          return updated;
+        });
+      });
+  }, [userId]);
+
   const updateSettings = useCallback((s: Settings) => {
     setSettings(s);
     saveSettings(s);
-    // Sync API keys to Supabase so the Telegram bot can use them
+    // Sync API keys to Supabase so they sync across devices and the Telegram bot can use them
     if (userId) {
       const sb = getSupabase();
       void sb?.from("user_settings").upsert({
@@ -161,6 +187,8 @@ export function useMeetings() {
         groq_api_key: s.whisperKey || null,
         anthropic_api_key: s.claudeKey || null,
         transcription_provider: s.transcriptionProvider,
+        hf_token: s.hfToken || null,
+        hf_endpoint_url: s.hfEndpointUrl || null,
       });
     }
   }, [userId]);
