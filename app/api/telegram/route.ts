@@ -166,10 +166,7 @@ async function getUserApiKeys(userId: string): Promise<{ groqKey?: string; anthr
 
 export async function POST(req: NextRequest) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  let groqKey = process.env.GROQ_API_KEY;
-  let anthropicKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!token) return NextResponse.json({ ok: true }); // silently ignore if not configured
+  if (!token) return NextResponse.json({ ok: true });
 
   let update: TgUpdate;
   try {
@@ -177,6 +174,15 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
+
+  // Return 200 immediately so Telegram never retries (long meetings take minutes to process)
+  void processUpdate(token, update);
+  return NextResponse.json({ ok: true });
+}
+
+async function processUpdate(token: string, update: TgUpdate) {
+  let groqKey = process.env.GROQ_API_KEY;
+  let anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   const msg = update.message;
   if (!msg) return NextResponse.json({ ok: true });
@@ -279,7 +285,7 @@ Rules:
 - Max 4 speakers
 TRANSCRIPT: ${rawTranscript}`;
 
-    const diariseRaw = await callClaude(anthropicKey, diarisePrompt, 4096);
+    const diariseRaw = await callClaude(anthropicKey, diarisePrompt, 16000);
     const { speakers, transcript } = JSON.parse(diariseRaw) as {
       speakers: Record<string, string>;
       transcript: { s: string; t: string; text: string }[];
@@ -295,7 +301,7 @@ TRANSCRIPT: ${rawTranscript}`;
 Max 6 action items. Be specific and actionable.
 TRANSCRIPT: ${transcriptText}`;
 
-    const summaryRaw = await callClaude(anthropicKey, summaryPrompt, 1024);
+    const summaryRaw = await callClaude(anthropicKey, summaryPrompt, 2048);
     const { summary, actions } = JSON.parse(summaryRaw) as {
       summary: string;
       actions: { text: string; owner: string }[];
@@ -304,18 +310,21 @@ TRANSCRIPT: ${transcriptText}`;
     // 5. Generate flowchart
     let flow = "";
     try {
-      const excerpts = transcript
-        .slice(0, 20)
-        .map((u) => `${speakers[u.s] ?? u.s}: ${u.text}`)
-        .join("\n");
-      const flowPrompt = `Generate a flowchart for this meeting as JSON. Return ONLY valid JSON — no backticks, no markdown, no explanation.
-Format: {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
-Node types: "start","end","decision","step"
-Rules: 6-12 nodes, labels max 5 words. When content lists multiple items under a parent (e.g. "three rules: A, B, C"), that parent node must be the "source" in SEPARATE edges to each child — NOT a chain A→B→C. Use decision nodes for yes/no or multi-choice points. Linear chains are fine when genuinely sequential.
+      const flowPrompt = `You are building a MIND MAP (not a flowchart) for a meeting discussion. Return ONLY valid JSON — no backticks, no markdown, no explanation.
+Format: {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2"}]}
+Node types: "start" (root topic), "step" (theme or sub-point), "end" (conclusion/outcome), "decision" (fork)
+Rules:
+1. Single root "start" node = overall meeting topic
+2. 2-5 main theme nodes connected to root
+3. 1-3 sub-point nodes per theme, connected to their parent
+4. Labels = clean concepts (3-5 words), NOT speech paraphrases
+5. Parallel sub-points fan out from parent — NEVER chain A→B→C
+6. ONLY add edge labels on decision node edges. Never label fan-out edges.
+7. Aim for 10-18 nodes total
 MEETING: Voice memo
 SUMMARY: ${summary}
-DISCUSSION: ${excerpts}`;
-      const flowRaw = await callClaude(anthropicKey, flowPrompt, 1024);
+TRANSCRIPT: ${transcriptText}`;
+      const flowRaw = await callClaude(anthropicKey, flowPrompt, 2048);
       const flowCleaned = flowRaw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
       JSON.parse(flowCleaned); // validate
       flow = flowCleaned;
@@ -400,6 +409,4 @@ DISCUSSION: ${excerpts}`;
     const errMsg = err instanceof Error ? err.message : "Unknown error";
     await tgSend(token, chatId, `❌ <b>Failed:</b> ${esc(errMsg)}`);
   }
-
-  return NextResponse.json({ ok: true });
 }
