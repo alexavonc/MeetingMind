@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Download, Link2, Check } from "lucide-react";
+import { ChevronDown, Download, Link2, Check, LayoutTemplate } from "lucide-react";
 import type { Meeting } from "@/types";
 
 function clean(text: string) {
@@ -21,10 +21,40 @@ interface Props {
   iconOnly?: boolean;
 }
 
+/** Convert flow JSON to Mermaid graph syntax for FigJam import */
+function flowToMermaid(flowJson: string): string | null {
+  try {
+    const raw = JSON.parse(flowJson) as {
+      nodes: { id: string; label: string; type?: string }[];
+      edges: { source: string; target: string; label?: string }[];
+    };
+    if (!raw.nodes?.length) return null;
+
+    // Sanitise label: strip quotes and special chars that break Mermaid
+    const esc = (s: string) => s.replace(/"/g, "'").replace(/[\[\]{}()]/g, " ").trim();
+
+    const nodeLines = raw.nodes.map((n) => {
+      const lbl = esc(n.label);
+      if (n.type === "start" || n.type === "end") return `  ${n.id}(["${lbl}"])`;
+      if (n.type === "decision") return `  ${n.id}{"${lbl}"}`;
+      return `  ${n.id}["${lbl}"]`;
+    });
+
+    const edgeLines = raw.edges.map((e) =>
+      e.label ? `  ${e.source} -->|"${esc(e.label)}"| ${e.target}` : `  ${e.source} --> ${e.target}`
+    );
+
+    return ["graph TD", ...nodeLines, "", ...edgeLines].join("\n");
+  } catch {
+    return null;
+  }
+}
+
 export default function ExportDropdown({ meeting, onShare, iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied">("idle");
+  const [figmaState, setFigmaState] = useState<"idle" | "copied" | "error">("idle");
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -263,6 +293,15 @@ export default function ExportDropdown({ meeting, onShare, iconOnly = false }: P
     }
   }
 
+  async function handleFigJam() {
+    setOpen(false);
+    const mermaid = meeting.flow ? flowToMermaid(meeting.flow) : null;
+    if (!mermaid) { setFigmaState("error"); setTimeout(() => setFigmaState("idle"), 2500); return; }
+    await navigator.clipboard.writeText(mermaid);
+    setFigmaState("copied");
+    setTimeout(() => setFigmaState("idle"), 3000);
+  }
+
   async function handleShare() {
     setOpen(false);
     setShareState("loading");
@@ -324,6 +363,17 @@ export default function ExportDropdown({ meeting, onShare, iconOnly = false }: P
             <Link2 className="w-4 h-4 text-muted-foreground" />
             Share as link
           </button>
+          {meeting.flow && (
+            <button
+              type="button"
+              onClick={handleFigJam}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground
+                hover:bg-secondary/60 transition-colors"
+            >
+              <LayoutTemplate className="w-4 h-4 text-muted-foreground" />
+              {figmaState === "copied" ? "Copied! Paste in FigJam" : figmaState === "error" ? "No flowchart yet" : "Copy for FigJam"}
+            </button>
+          )}
         </div>
       )}
     </div>
