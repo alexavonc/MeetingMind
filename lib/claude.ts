@@ -129,12 +129,19 @@ export async function notesToMeeting(
   title: string
 ): Promise<NotesResult> {
   const prompt = `You are given structured notes (may contain bullet points, numbered lists, headers, indented sub-items).
-Convert them into a meeting record. Return ONLY valid JSON (no backticks, no markdown):
+Convert them into a meeting record. Return ONLY valid JSON (no backticks, no markdown wrapper):
 {
-  "summary": "2-3 sentence overview of the content",
+  "summary": "<markdown>",
   "actions": [{"text": "specific action", "owner": "person or empty string", "done": false}],
-  "flow": {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2","label":"optional"}]}
+  "flow": {"nodes":[{"id":"n1","label":"short label","type":"start"}],"edges":[{"source":"n1","target":"n2"}]}
 }
+
+For the "summary" field, produce a STRUCTURED document in markdown with headed sections:
+- ## Section Title  (e.g. "## What it is", "## Core challenges", "## How it works today", "## Goals", "## Vision", "## Next steps")
+- Use "-" for bullet lists, "1." for numbered/ordered goals
+- Use **bold** for key terms or vision statements
+- Choose sections that fit the content — don't force sections that don't apply
+- Keep bullets concise (one idea each). Aim for 4-7 sections.
 
 Rules for actions:
 - Max 6 items. Only include concrete tasks or decisions. Skip if none.
