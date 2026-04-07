@@ -18,6 +18,7 @@ import Dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
 import type { Meeting } from "@/types";
 import ParsedText from "@/app/components/ParsedText";
+import MarkdownSummary from "@/app/components/MarkdownSummary";
 import { getSupabase } from "@/lib/supabase";
 
 // ── Flowchart helpers (same as FlowchartView) ─────────────────────────────────
@@ -220,7 +221,7 @@ export default function ShareView({ meeting }: { meeting: Meeting }) {
               <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
               Summary
             </h2>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{meeting.summary}</p>
+            <MarkdownSummary text={meeting.summary} />
           </section>
         )}
 
