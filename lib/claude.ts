@@ -105,7 +105,7 @@ Rules for action items:
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 1024);
+  const raw = await callClaude(apiKey, prompt, 3000);
   try {
     return JSON.parse(raw) as SummariseResult;
   } catch {
