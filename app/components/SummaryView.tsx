@@ -53,8 +53,8 @@ function MarkdownSummary({ text }: { text: string }) {
       const title = line.replace(/^#{2,3} /, "");
       elements.push(
         level === 2
-          ? <h3 key={elements.length} className="text-sm font-semibold text-foreground mt-5 mb-1.5 first:mt-0">{title}</h3>
-          : <h4 key={elements.length} className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-4 mb-1">{title}</h4>
+          ? <h3 key={elements.length} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-5 mb-1.5 first:mt-0">{title}</h3>
+          : <h4 key={elements.length} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70 mt-4 mb-1">{title}</h4>
       );
       continue;
     }
