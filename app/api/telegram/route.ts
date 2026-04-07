@@ -278,11 +278,12 @@ async function processUpdate(token: string, update: TgUpdate) {
     const diarisePrompt = `Diarise this transcript. Return ONLY valid JSON (no backticks):
 {"speakers":{"A":"name"},"transcript":[{"s":"A","t":"0:00","text":"cleaned"}]}
 Rules:
+- Identify DIFFERENT speakers by listening for: natural conversation turns, question-answer patterns, different speaking styles, topic handoffs, or phrases like "yeah", "okay", "so" that signal a response. Even if not obvious, try to assign at least 2 speakers if the content suggests a dialogue or briefing with responses.
 - Translate any Mandarin/Chinese spoken words to English. Wrap in [zh|English translation][/zh]
 - Phonetically transcribed Mandarin/Hokkien: "lai liao"/"lie there" → [zh|come already][/zh], "kuai teng" → [zh|faster][/zh], "mai lah" → [zh|don't want][/zh], "ho seh" → [zh|great][/zh]
 - Translate any Malay words or phrases to English. Wrap in [ms|English translation][/ms]. e.g. "contohnya" → [ms|for example][/ms], "boleh" → [ms|can][/ms], "sudah"/"dah" → [ms|already][/ms], full Malay sentences translated fully
 - Wrap Singlish slang in [sg]text[/sg]
-- Max 4 speakers
+- Max 4 speakers. Use "Speaker A", "Speaker B" etc. if names are unknown.
 TRANSCRIPT: ${rawTranscript}`;
 
     const diariseRaw = await callClaude(anthropicKey, diarisePrompt, 16000);
@@ -296,9 +297,17 @@ TRANSCRIPT: ${rawTranscript}`;
       .map((u) => `${speakers[u.s] ?? u.s} [${u.t}]: ${u.text}`)
       .join("\n");
 
-    const summaryPrompt = `Analyse this meeting. Return ONLY JSON (no backticks):
-{"summary":"2-3 sentences","actions":[{"text":"item","owner":"person","done":false}]}
-Max 6 action items. Be specific and actionable.
+    const summaryPrompt = `Analyse this meeting transcript. Return ONLY valid JSON (no backticks, no markdown wrapper):
+{"summary":"<markdown>","actions":[{"text":"item","owner":"person or empty string","done":false}]}
+
+For the "summary" field, produce a STRUCTURED document in markdown with headed sections:
+- ## Section Title  (e.g. "## What it is", "## Core challenges", "## How it works today", "## Goals", "## Vision", "## Next steps")
+- Use "-" for bullet lists, "1." for numbered/ordered goals
+- Use **bold** for key terms or vision statements
+- Choose sections that fit the content. Aim for 4-7 sections.
+- Keep bullets concise (one idea each).
+
+Rules for actions: Max 6 items, concrete tasks only, assign owner from speaker names where clear.
 TRANSCRIPT: ${transcriptText}`;
 
     const summaryRaw = await callClaude(anthropicKey, summaryPrompt, 2048);
