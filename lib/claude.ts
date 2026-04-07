@@ -82,13 +82,25 @@ export async function summarise(
     .map((u) => `${speakers[u.s] ?? u.s} [${u.t}]: ${u.text}`)
     .join("\n");
 
-  const prompt = `Analyse this meeting transcript. Return ONLY valid JSON (no backticks, no markdown):
-{"summary":"2-3 sentences","actions":[{"text":"action item","owner":"person name","done":false}]}
+  const prompt = `Analyse this meeting transcript. Return ONLY valid JSON (no backticks, no markdown wrapper):
+{"summary":"<markdown>","actions":[{"text":"action item","owner":"person name or empty string","done":false}]}
 
-Rules:
-- Maximum 6 action items
-- Be specific and actionable
-- Assign owner from speaker names
+For the "summary" field, produce a STRUCTURED document in markdown with headed sections. Use only these elements:
+- ## Section Title  (for main sections, e.g. "## What it is", "## Core challenges", "## How it works today", "## Goals", "## Vision", "## Next steps")
+- Bullet points with "-" for lists
+- Numbered lists "1." for ordered goals/steps
+- **bold** for emphasis on key terms or vision statements
+- Plain sentences for section intros if needed
+
+Choose sections that fit the content — don't force all sections if they don't apply.
+If the discussion has a clear vision statement, give it its own "## Vision" section.
+If there are numbered goals, use a numbered list under "## Goals".
+Keep each bullet concise (one idea per bullet). Aim for 4-7 sections total.
+
+Rules for action items:
+- Maximum 6 items
+- Only concrete tasks or decisions, not goals
+- Assign owner from speaker names where clear
 
 TRANSCRIPT:
 ${text}`;
