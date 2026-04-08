@@ -112,7 +112,6 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
     addFiles(e.dataTransfer.files);
   }
 
-  const totalMB = files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
 
   const submitLabel =
     mode === "notes"
