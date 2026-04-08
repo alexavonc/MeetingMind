@@ -486,7 +486,24 @@ export function useMeetings() {
           if (settings.transcriptionProvider !== "huggingface" && !settings.whisperKey)
             throw new Error("Transcription API key not set");
 
-          const fileList = Array.isArray(input) ? input : [input];
+          const rawFiles = Array.isArray(input) ? input : [input];
+
+          // Auto-split any file that exceeds Groq's 25 MB limit
+          const GROQ_LIMIT = 25 * 1024 * 1024;
+          const fileList: File[] = [];
+          for (const f of rawFiles) {
+            if (f.size > GROQ_LIMIT) {
+              setProcessing({ active: true, step: "transcribing", error: null, detail: "Splitting large file…" });
+              const { splitAudioFile } = await import("@/lib/splitAudio");
+              const parts = await splitAudioFile(f, (detail) =>
+                setProcessing({ active: true, step: "transcribing", error: null, detail })
+              );
+              fileList.push(...parts);
+            } else {
+              fileList.push(f);
+            }
+          }
+
           const parts: string[] = [];
           for (let i = 0; i < fileList.length; i++) {
             setProcessing({
