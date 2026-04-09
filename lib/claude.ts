@@ -122,9 +122,10 @@ ${DIARISE_RULES}
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 3500, "claude-haiku-4-5-20251001");
+  const raw = await callClaude(apiKey, prompt, 5000, "claude-haiku-4-5-20251001");
+  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
   try {
-    return JSON.parse(raw) as DiariseResult;
+    return JSON.parse(cleaned) as DiariseResult;
   } catch {
     throw new Error("Failed to parse diarisation response as JSON");
   }
