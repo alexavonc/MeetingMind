@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, type DragEvent } from "react";
-import { Upload, FileAudio, X, ChevronDown, Plus } from "lucide-react";
+import { Upload, FileAudio, FileVideo, X, ChevronDown, Plus, Video } from "lucide-react";
 import type { Folder } from "@/types";
 import type { ProcessingState } from "@/types";
 import ProcessingSteps from "./ProcessingSteps";
+import VideoRecorder from "./VideoRecorder";
 
 interface Props {
   open: boolean;
@@ -15,7 +16,7 @@ interface Props {
   folders: string[];
 }
 
-type Mode = "audio" | "text" | "notes";
+type Mode = "audio" | "video" | "text" | "notes";
 
 const NOTES_PLACEHOLDER = `e.g.
 
@@ -43,11 +44,17 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
   const [mode, setMode] = useState<Mode>("audio");
   const [title, setTitle] = useState("");
   const [folder, setFolder] = useState<Folder>("personal");
+  // Audio state
   const [files, setFiles] = useState<File[]>([]);
+  // Video state
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [showRecorder, setShowRecorder] = useState(false);
+  // Text/Notes state
   const [rawText, setRawText] = useState("");
   const [notes, setNotes] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
 
@@ -60,6 +67,8 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
     !processing.active &&
     (mode === "audio"
       ? files.length > 0
+      : mode === "video"
+      ? videoFile !== null
       : mode === "notes"
       ? notes.trim().length > 20
       : rawText.trim().length > 50);
@@ -69,6 +78,8 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
     try {
       if (mode === "notes") {
         await onSubmitNotes(notes, title.trim(), folder);
+      } else if (mode === "video") {
+        await onSubmit(videoFile!, title.trim(), folder);
       } else {
         const input = mode === "audio"
           ? (files.length === 1 ? files[0] : files)
@@ -87,6 +98,8 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
   function reset() {
     setTitle("");
     setFiles([]);
+    setVideoFile(null);
+    setShowRecorder(false);
     setRawText("");
     setNotes("");
     setMode("audio");
@@ -94,7 +107,9 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return;
-    const audioFiles = Array.from(incoming).filter((f) => f.type.startsWith("audio/") || /\.(m4a|mp3|wav|mp4|ogg|webm|flac)$/i.test(f.name));
+    const audioFiles = Array.from(incoming).filter(
+      (f) => f.type.startsWith("audio/") || /\.(m4a|mp3|wav|mp4|ogg|webm|flac)$/i.test(f.name)
+    );
     setFiles((prev) => {
       const existing = new Set(prev.map((f) => f.name + f.size));
       return [...prev, ...audioFiles.filter((f) => !existing.has(f.name + f.size))];
@@ -111,13 +126,29 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
     addFiles(e.dataTransfer.files);
   }
 
+  function handleVideoFile(incoming: FileList | null) {
+    if (!incoming) return;
+    const vf = Array.from(incoming).find(
+      (f) => f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name)
+    );
+    if (vf) { setVideoFile(vf); setShowRecorder(false); }
+  }
 
   const submitLabel =
     mode === "notes"
       ? "Generate flowchart"
+      : mode === "video"
+      ? "Process meeting"
       : files.length > 1
       ? `Process ${files.length} parts`
       : "Process meeting";
+
+  const TAB_LABELS: { key: Mode; label: string }[] = [
+    { key: "audio", label: "Audio" },
+    { key: "video", label: "Video" },
+    { key: "text", label: "Transcript" },
+    { key: "notes", label: "Notes" },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
@@ -175,25 +206,25 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
 
               {/* Mode toggle */}
               <div className="flex rounded-lg bg-secondary p-1 gap-1">
-                {(["audio", "text", "notes"] as Mode[]).map((m) => (
+                {TAB_LABELS.map(({ key, label }) => (
                   <button
-                    key={m}
+                    key={key}
                     type="button"
-                    onClick={() => setMode(m)}
+                    onClick={() => { setMode(key); setShowRecorder(false); }}
                     className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                      mode === m
+                      mode === key
                         ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {m === "audio" ? "Audio" : m === "text" ? "Transcript" : "Notes"}
+                    {label}
                   </button>
                 ))}
               </div>
 
-              {mode === "audio" ? (
+              {/* Audio mode */}
+              {mode === "audio" && (
                 <div className="space-y-3">
-                  {/* Drop zone */}
                   <div
                     onDrop={handleDrop}
                     onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -249,7 +280,71 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
                     </div>
                   )}
                 </div>
-              ) : mode === "text" ? (
+              )}
+
+              {/* Video mode */}
+              {mode === "video" && (
+                <div className="space-y-3">
+                  {showRecorder ? (
+                    <VideoRecorder
+                      onRecorded={(file) => { setVideoFile(file); setShowRecorder(false); }}
+                      onCancel={() => setShowRecorder(false)}
+                    />
+                  ) : videoFile ? (
+                    /* Confirmed video file */
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/50 border border-border">
+                        <FileVideo className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="flex-1 text-sm text-foreground truncate">{videoFile.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</span>
+                        <button type="button" onClick={() => setVideoFile(null)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground px-1">
+                        Audio will be extracted and transcribed. Frames with visible content (whiteboards, slides) will be analyzed with Claude Vision.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Choose upload or record */
+                    <div className="space-y-3">
+                      <div
+                        onClick={() => videoRef.current?.click()}
+                        className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors border-border hover:border-primary/50 hover:bg-secondary/30"
+                      >
+                        <input
+                          ref={videoRef}
+                          type="file"
+                          accept="video/*,.mp4,.webm,.mov,.m4v"
+                          className="hidden"
+                          onChange={(e) => handleVideoFile(e.target.files)}
+                        />
+                        <Upload className="w-7 h-7 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-foreground">Drop a video file here</p>
+                        <p className="text-xs text-muted-foreground mt-1">or click to browse · mp4, webm, mov</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-xs text-muted-foreground">or</span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowRecorder(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border text-sm text-foreground hover:bg-secondary/50 transition-colors"
+                      >
+                        <Video className="w-4 h-4 text-primary" />
+                        Record from camera
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transcript mode */}
+              {mode === "text" && (
                 <textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
@@ -259,7 +354,10 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
                     placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring
                     resize-none font-mono"
                 />
-              ) : (
+              )}
+
+              {/* Notes mode */}
+              {mode === "notes" && (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">
                     Paste bullet-point notes, agendas, or any structured text. Claude will generate a summary, action items, and a flowchart that mirrors your structure.
@@ -281,7 +379,13 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
 
         {/* Footer */}
         {!processing.active && (
-          <div className="px-6 pb-5 flex justify-end gap-3">
+          <div className="px-6 pb-5 space-y-3">
+            {processing.error && (
+              <div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive">
+                {processing.error}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
               Cancel
             </button>
@@ -294,6 +398,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
             >
               {submitLabel}
             </button>
+            </div>
           </div>
         )}
       </div>
