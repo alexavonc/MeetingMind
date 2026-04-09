@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 300; // 5 minutes — long meetings need time
+
 export async function POST(req: NextRequest) {
   try {
     const { apiKey, prompt, maxTokens = 2048 } = (await req.json()) as {

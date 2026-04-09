@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 120;
+
 interface ImageInput {
   base64: string;   // full data URL, e.g. "data:image/jpeg;base64,..."
   timestamp: number; // seconds, for the frame label

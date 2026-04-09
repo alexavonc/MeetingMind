@@ -66,7 +66,7 @@ Rules:
 TRANSCRIPT:
 ${rawTranscript}`;
 
-  const raw = await callClaude(apiKey, prompt, 4096);
+  const raw = await callClaude(apiKey, prompt, 16000);
   try {
     return JSON.parse(raw) as DiariseResult;
   } catch {
