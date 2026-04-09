@@ -46,14 +46,33 @@ async function callClaude(
   return text;
 }
 
-export async function diarise(
-  apiKey: string,
-  rawTranscript: string
-): Promise<DiariseResult> {
-  const prompt = `Diarise this transcript. Return ONLY valid JSON (no backticks, no markdown):
-{"speakers":{"A":"name"},"transcript":[{"s":"A","t":"0:00","text":"cleaned"}]}
+// ── Diarisation ──────────────────────────────────────────────────────────────
+// Long transcripts are split into ~20-min chunks so each Claude call stays
+// under 40 seconds and avoids proxy / connection timeouts entirely.
 
-Rules:
+const MAX_DIARISE_CHARS = 18_000; // ≈ 24 min of speech at 750 chars/min
+
+/** Split raw transcript into chunks at natural sentence/paragraph boundaries. */
+function splitTranscript(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+  const chunks: string[] = [];
+  let pos = 0;
+  while (pos < text.length) {
+    if (pos + maxChars >= text.length) { chunks.push(text.slice(pos).trim()); break; }
+    const end = pos + maxChars;
+    const nl  = text.lastIndexOf("\n", end);
+    const dot = text.lastIndexOf(". ", end);
+    const split = nl  > pos + maxChars * 0.6 ? nl + 1
+                : dot > pos + maxChars * 0.6 ? dot + 2
+                : end;
+    chunks.push(text.slice(pos, split).trim());
+    pos = split;
+    while (pos < text.length && text[pos] === "\n") pos++;
+  }
+  return chunks.filter(Boolean);
+}
+
+const DIARISE_RULES = `Rules:
 - Translate any Mandarin/Chinese spoken words into English. Wrap the translation in [zh|English translation][/zh]
 - Translate any Malay words or phrases into English. Wrap in [ms|English translation][/ms]. Common Malay words used by Singapore speakers:
   - "contohnya" → [ms|for example][/ms]
@@ -78,17 +97,65 @@ Rules:
   - Any pinyin-like syllables (e.g. "ni", "wo", "ta", "men", "de", "shi", "bu") in unusual context
 - Wrap Singlish slang in [sg]text[/sg]
 - Max 4 speakers
-- Keep timestamps as MM:SS
+- Keep timestamps as MM:SS`;
+
+async function diariseChunk(
+  apiKey: string,
+  text: string,
+  existingSpeakers: Record<string, string>,
+  startMinutes: number
+): Promise<DiariseResult> {
+  const m = Math.floor(startMinutes);
+  const s = Math.floor((startMinutes % 1) * 60);
+  const startLabel = `${m}:${String(s).padStart(2, "0")}`;
+  const speakerNote = Object.keys(existingSpeakers).length > 0
+    ? `\nIMPORTANT: Use these exact speaker labels (already identified from earlier in the meeting): ${JSON.stringify(existingSpeakers)}\n`
+    : "";
+
+  const prompt = `Diarise this transcript. Return ONLY valid JSON (no backticks, no markdown):
+{"speakers":{"A":"name"},"transcript":[{"s":"A","t":"${startLabel}","text":"cleaned"}]}
+${speakerNote}
+${DIARISE_RULES}
+- Timestamps in this section start at approximately ${startLabel} and increase from there
 
 TRANSCRIPT:
-${rawTranscript}`;
+${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 16000);
+  const raw = await callClaude(apiKey, prompt, 8000);
   try {
     return JSON.parse(raw) as DiariseResult;
   } catch {
     throw new Error("Failed to parse diarisation response as JSON");
   }
+}
+
+export async function diarise(
+  apiKey: string,
+  rawTranscript: string
+): Promise<DiariseResult> {
+  const chunks = splitTranscript(rawTranscript, MAX_DIARISE_CHARS);
+
+  // Short meeting — single call as before
+  if (chunks.length === 1) {
+    return diariseChunk(apiKey, chunks[0], {}, 0);
+  }
+
+  // Long meeting — process chunks sequentially, carrying speaker labels forward
+  let knownSpeakers: Record<string, string> = {};
+  const allUtterances: Utterance[] = [];
+  let charsProcessed = 0;
+
+  for (const chunk of chunks) {
+    const startMinutes = charsProcessed / 750; // 750 chars/min ≈ 150 wpm × 5 chars
+    const result = await diariseChunk(apiKey, chunk, knownSpeakers, startMinutes);
+    for (const [k, v] of Object.entries(result.speakers)) {
+      if (!knownSpeakers[k]) knownSpeakers[k] = v; // keep first-identified names
+    }
+    allUtterances.push(...result.transcript);
+    charsProcessed += chunk.length;
+  }
+
+  return { speakers: knownSpeakers, transcript: allUtterances };
 }
 
 export async function summarise(
