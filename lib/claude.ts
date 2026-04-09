@@ -21,12 +21,29 @@ async function callClaude(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey, prompt, maxTokens }),
   });
+
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Claude API error: ${err}`);
   }
-  const data = (await res.json()) as { text: string };
-  return data.text;
+
+  // Read the streaming plain-text response (text deltas piped from Anthropic)
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+
+  // Check for error sentinel emitted by the server route
+  if (text.startsWith("\x00")) {
+    throw new Error(`Claude API error: ${text.slice(1)}`);
+  }
+
+  return text;
 }
 
 export async function diarise(
