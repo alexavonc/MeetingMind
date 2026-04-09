@@ -58,7 +58,6 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
   const canSubmit =
     title.trim() &&
     !processing.active &&
-    oversizedFiles.length === 0 &&
     (mode === "audio"
       ? files.length > 0
       : mode === "notes"
@@ -242,12 +241,9 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
                         <span className="text-xs text-muted-foreground">{files.length} file{files.length > 1 ? "s" : ""} · {totalMB.toFixed(1)} MB total</span>
                       </div>
                       {oversizedFiles.length > 0 && (
-                        <div className="mt-2 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 space-y-1">
-                          <p className="font-semibold">File too large for Groq (25 MB limit)</p>
-                          {oversizedFiles.map(f => (
-                            <p key={f.name}>{f.name} — {(f.size / 1024 / 1024).toFixed(1)} MB</p>
-                          ))}
-                          <p className="text-red-600 mt-1">Compress it first: on Mac use <strong>QuickTime → Export → Audio Only</strong>, or split into multiple files under 25 MB each and upload together.</p>
+                        <div className="mt-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                          <p className="font-medium">Large file detected — will auto-split</p>
+                          <p className="mt-0.5 text-blue-600">Files over 25 MB are automatically split into parts and merged into one meeting.</p>
                         </div>
                       )}
                     </div>
