@@ -5,7 +5,7 @@ import type { Meeting, Settings, Folder, ProcessingState } from "@/types";
 import { loadDB, saveDB, loadSettings, saveSettings } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
 import { SEED_MEETINGS } from "@/lib/seeds";
-import { diarise, summarise, genFlow, notesToMeeting } from "@/lib/claude";
+import { diarise, summarise, genFlow, notesToMeeting, analyzeVisuals } from "@/lib/claude";
 import { transcribeAudio } from "@/lib/whisper";
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -217,6 +217,7 @@ export function useMeetings() {
       throw new Error("Transcription API key not set");
 
     setProcessing({ active: true, step: "transcribing", error: null });
+    await Promise.resolve();
 
     try {
       // Resolve audio file — new upload or fetch existing URL
@@ -474,9 +475,11 @@ export function useMeetings() {
   const processUpload = useCallback(
     async (input: File | File[] | string, title: string, folder: Folder) => {
       setProcessing({ active: true, step: "transcribing", error: null });
+      await Promise.resolve(); // yield so React renders active:true before synchronous checks
       try {
         if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
         let raw: string;
+        let visualContext = ""; // hoisted so newMeeting can reference it
         if (typeof input === "string") {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
@@ -487,11 +490,44 @@ export function useMeetings() {
             throw new Error("Transcription API key not set");
 
           const rawFiles = Array.isArray(input) ? input : [input];
+          const isVideoFile = (f: File) =>
+            f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
 
-          // Auto-split any file that exceeds Groq's 25 MB limit
+          // ── Video files: extract audio track + analyze keyframes ────────────
+          const audioFiles: File[] = [];
+
+          for (const f of rawFiles) {
+            if (isVideoFile(f)) {
+              // Extract audio from video (decodeAudioData works on video files)
+              setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio from video…" });
+              const { splitAudioFile } = await import("@/lib/splitAudio");
+              const audioChunks = await splitAudioFile(f, (detail) =>
+                setProcessing({ active: true, step: "transcribing", error: null, detail })
+              );
+              audioFiles.push(...audioChunks);
+
+              // Extract + analyze keyframes for visual context (non-critical)
+              try {
+                setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
+                const { extractKeyframes } = await import("@/lib/extractVideoFrames");
+                const frames = await extractKeyframes(f, (detail) =>
+                  setProcessing({ active: true, step: "transcribing", error: null, detail })
+                );
+                if (frames.length > 0) {
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: `Analyzing ${frames.length} frames with Claude Vision…` });
+                  const notes = await analyzeVisuals(settings.claudeKey, frames);
+                  if (notes) visualContext += notes + "\n";
+                }
+              } catch { /* non-critical — continue without visual context */ }
+            } else {
+              audioFiles.push(f);
+            }
+          }
+
+          // ── Auto-split any audio file that exceeds Groq's 25 MB limit ───────
           const GROQ_LIMIT = 25 * 1024 * 1024;
           const fileList: File[] = [];
-          for (const f of rawFiles) {
+          for (const f of audioFiles) {
             if (f.size > GROQ_LIMIT) {
               setProcessing({ active: true, step: "transcribing", error: null, detail: "Splitting large file…" });
               const { splitAudioFile } = await import("@/lib/splitAudio");
@@ -519,6 +555,11 @@ export function useMeetings() {
           raw = parts.length === 1
             ? parts[0]
             : parts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
+
+          // Prepend visual context from video frames so Claude incorporates it
+          if (visualContext) {
+            raw = `[VISUAL CONTEXT FROM VIDEO FRAMES]\n${visualContext.trim()}\n[END VISUAL CONTEXT]\n\n${raw}`;
+          }
 
           setProcessing({ active: true, step: "diarising", error: null });
         }
@@ -570,6 +611,7 @@ export function useMeetings() {
           languages: detectLanguages(diarised.transcript),
           flow,
           ...(audioUrl ? { audiourl: audioUrl } : {}),
+          ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
         };
 
         setMeetings((prev) => {

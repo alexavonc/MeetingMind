@@ -1,4 +1,5 @@
 import type { Meeting, Utterance, Action } from "@/types";
+import type { VideoFrame } from "@/lib/extractVideoFrames";
 
 interface DiariseResult {
   speakers: Record<string, string>;
@@ -171,6 +172,36 @@ ${notes}`;
   // Validate flowchart JSON
   JSON.parse(flowStr);
   return { summary: parsed.summary, actions: parsed.actions, flow: flowStr };
+}
+
+/**
+ * Analyze keyframes extracted from a meeting video using Claude Vision.
+ * Returns a markdown string describing visible content (whiteboards, slides, screens).
+ * Non-blocking — returns empty string on failure.
+ */
+export async function analyzeVisuals(
+  apiKey: string,
+  frames: VideoFrame[]
+): Promise<string> {
+  if (!frames.length) return "";
+
+  try {
+    const res = await fetch("/api/claude-vision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        images: frames.map((f) => ({ base64: f.dataUrl, timestamp: f.timestamp })),
+        prompt: `These are frames extracted from a meeting recording. For each frame that shows a whiteboard, screen, slide, or any visible text/diagram, describe what you see. Focus only on content that adds context to the meeting discussion — skip frames that just show people talking with no visible content. Format as bullet points referencing the timestamp label above each frame.`,
+        maxTokens: 1500,
+      }),
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as { text?: string };
+    return data.text ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export async function genFlow(
