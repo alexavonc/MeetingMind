@@ -50,7 +50,7 @@ async function callClaude(
 // Long transcripts are split into ~20-min chunks so each Claude call stays
 // under 40 seconds and avoids proxy / connection timeouts entirely.
 
-const MAX_DIARISE_CHARS = 18_000; // ≈ 24 min of speech at 750 chars/min
+const MAX_DIARISE_CHARS = 8_000; // ≈ 10 min of speech — keeps each Claude call under ~2 min
 
 /** Split raw transcript into chunks at natural sentence/paragraph boundaries. */
 function splitTranscript(text: string, maxChars: number): string[] {
@@ -121,7 +121,7 @@ ${DIARISE_RULES}
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 8000);
+  const raw = await callClaude(apiKey, prompt, 3500);
   try {
     return JSON.parse(raw) as DiariseResult;
   } catch {
