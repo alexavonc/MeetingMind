@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 300; // 5 minutes — large audio files need time
+
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const HF_SINGLISH_URL = "https://api-inference.huggingface.co/models/mjwong/whisper-large-v3-turbo-singlish";
