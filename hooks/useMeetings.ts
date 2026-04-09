@@ -631,7 +631,7 @@ export function useMeetings() {
         throw err;
       }
     },
-    [settings]
+    [settings, userId]
   );
 
   const selectedMeeting = meetings.find((m) => m.id === selectedId) ?? null;
