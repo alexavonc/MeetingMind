@@ -4,10 +4,11 @@ export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, prompt, maxTokens = 2048 } = (await req.json()) as {
+    const { apiKey, prompt, maxTokens = 2048, model = "claude-sonnet-4-20250514" } = (await req.json()) as {
       apiKey: string;
       prompt: string;
       maxTokens?: number;
+      model?: string;
     };
 
     if (!apiKey) {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model,
         max_tokens: maxTokens,
         stream: true,
         messages: [{ role: "user", content: prompt }],

@@ -14,12 +14,13 @@ interface SummariseResult {
 async function callClaude(
   apiKey: string,
   prompt: string,
-  maxTokens = 2048
+  maxTokens = 2048,
+  model = "claude-sonnet-4-20250514"
 ): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, prompt, maxTokens }),
+    body: JSON.stringify({ apiKey, prompt, maxTokens, model }),
   });
 
   if (!res.ok) {
@@ -121,7 +122,7 @@ ${DIARISE_RULES}
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 3500);
+  const raw = await callClaude(apiKey, prompt, 3500, "claude-haiku-4-5-20251001");
   try {
     return JSON.parse(raw) as DiariseResult;
   } catch {
