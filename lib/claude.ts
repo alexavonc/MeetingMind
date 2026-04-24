@@ -124,8 +124,11 @@ ${text}`;
 
   const raw = await callClaude(apiKey, prompt, 5000, "claude-haiku-4-5-20251001");
   const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  // Extract outermost JSON object in case Haiku added preamble/postamble text
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  const toParse = jsonMatch ? jsonMatch[0] : cleaned;
   try {
-    return JSON.parse(cleaned) as DiariseResult;
+    return JSON.parse(toParse) as DiariseResult;
   } catch {
     throw new Error("Failed to parse diarisation response as JSON");
   }
