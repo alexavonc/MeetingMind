@@ -134,10 +134,54 @@ ${text}`;
   }
 }
 
+/**
+ * Detect and parse transcripts that are already speaker-labelled, e.g.:
+ *   "Leon T: But there may be..."
+ *   "Pradeep K: OK."
+ * Returns null if the format isn't recognised (falls through to Claude diarisation).
+ */
+function parsePreLabelled(text: string): DiariseResult | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Require at least half the lines to match "SpeakerName: text"
+  const RE = /^([A-Za-z][A-Za-z .'-]{0,40}):\s+(.+)$/;
+  const matched = lines.filter((l) => RE.test(l));
+  if (matched.length < Math.max(3, lines.length * 0.5)) return null;
+
+  const nameToKey: Record<string, string> = {};
+  const speakers: Record<string, string> = {};
+  let keyIdx = 0;
+  const transcript: Utterance[] = [];
+
+  for (const line of lines) {
+    const m = RE.exec(line);
+    if (!m) continue;
+    const [, name, utterance] = m;
+    if (!nameToKey[name]) {
+      const key = String.fromCharCode(65 + keyIdx++); // A, B, C …
+      nameToKey[name] = key;
+      speakers[key] = name;
+    }
+    const key = nameToKey[name];
+    // Derive a rough timestamp from position (no real timestamps available)
+    const idx = transcript.length;
+    const mins = Math.floor(idx / 2);
+    const secs = (idx % 2) * 30;
+    transcript.push({ s: key, t: `${mins}:${String(secs).padStart(2, "0")}`, text: utterance });
+  }
+
+  if (transcript.length === 0) return null;
+  return { speakers, transcript };
+}
+
 export async function diarise(
   apiKey: string,
   rawTranscript: string
 ): Promise<DiariseResult> {
+  // If the transcript is already speaker-labelled ("Name: text" lines), parse it
+  // directly — no need to call Claude at all.
+  const preParsed = parsePreLabelled(rawTranscript);
+  if (preParsed) return preParsed;
+
   const chunks = splitTranscript(rawTranscript, MAX_DIARISE_CHARS);
 
   // Short meeting — single call as before
