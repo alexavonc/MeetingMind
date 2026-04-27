@@ -524,34 +524,41 @@ export function useMeetings() {
             }
           }
 
-          // ── Auto-split any audio file that exceeds Groq's 25 MB limit ───────
+          // ── Split + transcribe each file sequentially to minimise peak memory ─
+          // (splitting all files first then transcribing would hold all decoded
+          //  audio in memory simultaneously, crashing mobile browser tabs)
           const GROQ_LIMIT = 25 * 1024 * 1024;
-          const fileList: File[] = [];
+          const parts: string[] = [];
+          let globalPartIdx = 0;
+
           for (const f of audioFiles) {
+            let chunks: File[];
             if (f.size > GROQ_LIMIT) {
-              setProcessing({ active: true, step: "transcribing", error: null, detail: "Splitting large file…" });
+              setProcessing({ active: true, step: "transcribing", error: null, detail: `Splitting ${f.name}…` });
               const { splitAudioFile } = await import("@/lib/splitAudio");
-              const parts = await splitAudioFile(f, (detail) =>
+              chunks = await splitAudioFile(f, (detail) =>
                 setProcessing({ active: true, step: "transcribing", error: null, detail })
               );
-              fileList.push(...parts);
             } else {
-              fileList.push(f);
+              chunks = [f];
+            }
+
+            for (const chunk of chunks) {
+              globalPartIdx++;
+              setProcessing({
+                active: true, step: "transcribing", error: null,
+                detail: audioFiles.length > 1 || chunks.length > 1
+                  ? `File ${audioFiles.indexOf(f) + 1}/${audioFiles.length} · part ${globalPartIdx}`
+                  : undefined,
+              });
+              const part = await transcribeAudio(
+                settings.whisperKey, chunk, settings.transcriptionProvider,
+                settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
+              );
+              parts.push(part);
             }
           }
 
-          const parts: string[] = [];
-          for (let i = 0; i < fileList.length; i++) {
-            setProcessing({
-              active: true, step: "transcribing", error: null,
-              detail: fileList.length > 1 ? `Part ${i + 1} of ${fileList.length}` : undefined,
-            });
-            const part = await transcribeAudio(
-              settings.whisperKey, fileList[i], settings.transcriptionProvider,
-              settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
-            );
-            parts.push(part);
-          }
           raw = parts.length === 1
             ? parts[0]
             : parts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
