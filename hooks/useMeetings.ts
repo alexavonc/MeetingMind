@@ -25,7 +25,15 @@ async function dbUpsert(meeting: Meeting, userId?: string) {
   const sb = getSupabase();
   if (!sb) return;
   const row = userId ? { ...meeting, user_id: userId } : meeting;
-  await sb.from("meetings").upsert(row);
+  const { error } = await sb.from("meetings").upsert(row);
+  if (error) {
+    // Columns like frameurls/pointers may not exist yet — retry with core fields only
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { frameurls, pointers, visualnotes, ...coreRow } = row as typeof row & {
+      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown;
+    };
+    await sb.from("meetings").upsert(coreRow);
+  }
 }
 
 async function dbUpsertMany(meetings: Meeting[], userId?: string) {
