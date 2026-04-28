@@ -103,22 +103,22 @@ export default function SummaryView({ meeting, onToggleAction }: Props) {
       )}
 
       {/* Attachments — keyframes captured from video */}
-      {meeting.frames && meeting.frames.length > 0 && (
+      {meeting.frameurls && meeting.frameurls.length > 0 && (
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Attachments
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {meeting.frames.map((frame, i) => (
+            {meeting.frameurls.map((frame, i) => (
               <a
                 key={i}
-                href={frame.dataUrl}
+                href={frame.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group block rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-colors"
               >
                 <img
-                  src={frame.dataUrl}
+                  src={frame.url}
                   alt={`Screen capture at ${fmtSeconds(frame.timestamp)}`}
                   className="w-full object-cover"
                 />

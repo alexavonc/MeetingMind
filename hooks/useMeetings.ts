@@ -526,9 +526,10 @@ export function useMeetings() {
       await Promise.resolve(); // yield so React renders active:true before synchronous checks
       try {
         if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
+        const meetingId = `meeting-${Date.now()}`;
         let raw: string;
         let visualContext = ""; // hoisted so newMeeting can reference it
-        let savedFrames: { dataUrl: string; timestamp: number }[] | undefined;
+        let savedFrameUrls: { url: string; timestamp: number }[] | undefined;
         if (typeof input === "string") {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
@@ -595,14 +596,26 @@ export function useMeetings() {
                   const notes = await analyzeVisuals(settings.claudeKey, frames);
                   if (notes) visualContext += notes + "\n";
 
-                  // Compress and save up to 5 keyframes for the Attachments section
-                  const toSave = frames.slice(0, 5);
-                  savedFrames = await Promise.all(
-                    toSave.map(async (fr) => ({
-                      dataUrl: await compressFrame(fr.dataUrl, 400, 0.6),
-                      timestamp: fr.timestamp,
-                    }))
-                  );
+                  // Compress and upload up to 5 keyframes to Supabase Storage
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Saving frame screenshots…" });
+                  try {
+                    const toSave = frames.slice(0, 5);
+                    const compressed = await Promise.all(
+                      toSave.map(async (fr) => ({
+                        dataUrl: await compressFrame(fr.dataUrl, 400, 0.6),
+                        timestamp: fr.timestamp,
+                      }))
+                    );
+                    const res = await fetch("/api/store-frames", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ meetingId, frames: compressed }),
+                    });
+                    if (res.ok) {
+                      const { frameUrls } = await res.json() as { frameUrls: { url: string; timestamp: number }[] };
+                      if (frameUrls?.length) savedFrameUrls = frameUrls;
+                    }
+                  } catch { /* non-critical */ }
                 }
               } catch { /* non-critical */ }
             } else {
@@ -663,8 +676,6 @@ export function useMeetings() {
         );
         setProcessing({ active: true, step: "flowcharting", error: null });
 
-        const meetingId = `meeting-${Date.now()}`;
-
         const tmpMeeting = {
           id: meetingId, title, folder, date: "", duration: "",
           languages: [] as Meeting["languages"],
@@ -706,7 +717,7 @@ export function useMeetings() {
           flow,
           ...(audioUrl ? { audiourl: audioUrl } : {}),
           ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
-          ...(savedFrames ? { frames: savedFrames } : {}),
+          ...(savedFrameUrls ? { frameurls: savedFrameUrls } : {}),
           ...(pointers ? { pointers } : {}),
         };
 
