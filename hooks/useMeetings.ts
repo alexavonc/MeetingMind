@@ -493,31 +493,29 @@ export function useMeetings() {
           const isVideoFile = (f: File) =>
             f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
 
-          // ── Video files: extract audio track + analyze keyframes ────────────
+          // ── Video files: server-side FFmpeg extraction + keyframe analysis ────
+          // Client-side Web Audio decodeAudioData fails on iOS for large videos.
+          // Server extracts audio at 32kbps mono → 40 min ≈ 10 MB, no splitting needed.
           const audioFiles: File[] = [];
           const GROQ_LIMIT = 25 * 1024 * 1024;
+          const transcriptParts: string[] = [];
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
-              // Whisper accepts mp4/webm directly — only run Web Audio extraction
-              // if the file exceeds the 25 MB API limit (extraction also splits it).
-              // Web Audio decodeAudioData fails on iOS for large/unsupported files.
-              if (f.size <= GROQ_LIMIT) {
-                audioFiles.push(f);
-              } else {
-                try {
-                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio from video…" });
-                  const { splitAudioFile } = await import("@/lib/splitAudio");
-                  const audioChunks = await splitAudioFile(f, (detail) =>
-                    setProcessing({ active: true, step: "transcribing", error: null, detail })
-                  );
-                  audioFiles.push(...audioChunks);
-                } catch {
-                  throw new Error("Could not extract audio from this video file. Try a smaller file or convert to mp3/m4a first.");
-                }
+              setProcessing({ active: true, step: "transcribing", error: null, detail: "Uploading video for server processing…" });
+              const form = new FormData();
+              form.append("file", f);
+              form.append("whisperKey", settings.whisperKey);
+              form.append("provider", settings.transcriptionProvider);
+              const res = await fetch("/api/video-process", { method: "POST", body: form });
+              if (!res.ok) {
+                const { error } = await res.json() as { error: string };
+                throw new Error(error || "Video processing failed");
               }
+              const { text } = await res.json() as { text: string };
+              transcriptParts.push(text);
 
-              // Extract + analyze keyframes for visual context (non-critical)
+              // Keyframe analysis for visual context (non-critical, skipped if too slow)
               try {
                 setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
                 const { extractKeyframes } = await import("@/lib/extractVideoFrames");
@@ -529,7 +527,7 @@ export function useMeetings() {
                   const notes = await analyzeVisuals(settings.claudeKey, frames);
                   if (notes) visualContext += notes + "\n";
                 }
-              } catch { /* non-critical — continue without visual context */ }
+              } catch { /* non-critical */ }
             } else {
               audioFiles.push(f);
             }
@@ -567,9 +565,10 @@ export function useMeetings() {
             }
           }
 
-          raw = parts.length === 1
-            ? parts[0]
-            : parts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
+          const allParts = [...transcriptParts, ...parts];
+          raw = allParts.length === 1
+            ? allParts[0]
+            : allParts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
 
           // Prepend visual context from video frames so Claude incorporates it
           if (visualContext) {
