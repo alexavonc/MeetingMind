@@ -19,11 +19,12 @@ export default function PointersView({ meeting }: Props) {
   if (!meeting.pointers) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+        <div className="w-5 h-5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
         <p className="text-sm text-muted-foreground">
-          No pointers available for this meeting.
+          Pointers are being generated…
         </p>
         <p className="text-xs text-muted-foreground/60">
-          Pointers are generated automatically for new recordings.
+          This tab will populate shortly — no need to wait here.
         </p>
       </div>
     );

@@ -683,29 +683,13 @@ export function useMeetings() {
           summary, actions, flow: "",
         } as Meeting;
 
-        const [flow, pointers] = await Promise.all([
-          genFlow(settings.claudeKey, tmpMeeting),
-          genPointers(settings.claudeKey, diarised.transcript, diarised.speakers).catch(() => ""),
-        ]);
-        setProcessing({ active: true, step: "saving", error: null });
+        // Start pointers immediately — fire-and-forget so it doesn't gate saving
+        const pointersPromise = genPointers(settings.claudeKey, diarised.transcript, diarised.speakers)
+          .catch(() => "");
 
-        // Upload audio to Supabase Storage (single file only, best-effort)
-        let audioUrl: string | undefined;
-        if (typeof input !== "string") {
-          const fileList = Array.isArray(input) ? input : [input];
-          if (fileList.length === 1) {
-            try {
-              const form = new FormData();
-              form.append("file", fileList[0]);
-              form.append("meetingId", meetingId);
-              const res = await fetch("/api/store-audio", { method: "POST", body: form });
-              if (res.ok) {
-                const { url } = (await res.json()) as { url: string };
-                audioUrl = url;
-              }
-            } catch { /* non-critical */ }
-          }
-        }
+        setProcessing({ active: true, step: "flowcharting", error: null });
+        const flow = await genFlow(settings.claudeKey, tmpMeeting);
+        setProcessing({ active: true, step: "saving", error: null });
 
         const newMeeting: Meeting = {
           ...tmpMeeting,
@@ -715,22 +699,58 @@ export function useMeetings() {
           duration: `${Math.ceil(diarised.transcript.length * 0.5)} min`,
           languages: detectLanguages(diarised.transcript),
           flow,
-          ...(audioUrl ? { audiourl: audioUrl } : {}),
           ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
           ...(savedFrameUrls ? { frameurls: savedFrameUrls } : {}),
-          ...(pointers ? { pointers } : {}),
+          // pointers added via background update below
         };
 
+        // Save to DB immediately — don't wait for audio upload or pointers
         setMeetings((prev) => {
           const updated = [newMeeting, ...prev];
           saveDB(updated);
           return updated;
         });
-        await dbUpsert(newMeeting, userId ?? undefined); // save to Supabase with user_id
+        await dbUpsert(newMeeting, userId ?? undefined);
 
         setSelectedFolder(folder);
         setSelectedId(newMeeting.id);
         setProcessing({ active: false, step: "done", error: null });
+
+        // Background: upload audio then patch the row
+        if (typeof input !== "string") {
+          const fileList = Array.isArray(input) ? input : [input];
+          if (fileList.length === 1) {
+            (async () => {
+              try {
+                const form = new FormData();
+                form.append("file", fileList[0]);
+                form.append("meetingId", meetingId);
+                const res = await fetch("/api/store-audio", { method: "POST", body: form });
+                if (res.ok) {
+                  const { url } = (await res.json()) as { url: string };
+                  setMeetings((prev) => {
+                    const updated = prev.map((m) => m.id === meetingId ? { ...m, audiourl: url } : m);
+                    saveDB(updated);
+                    return updated;
+                  });
+                  dbUpdate(meetingId, { audiourl: url });
+                }
+              } catch { /* non-critical */ }
+            })();
+          }
+        }
+
+        // Background: update meeting with pointers when ready
+        pointersPromise.then(async (pointers) => {
+          if (!pointers) return;
+          setMeetings((prev) => {
+            const updated = prev.map((m) => m.id === meetingId ? { ...m, pointers } : m);
+            saveDB(updated);
+            return updated;
+          });
+          await dbUpdate(meetingId, { pointers });
+        });
+
         return newMeeting;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
