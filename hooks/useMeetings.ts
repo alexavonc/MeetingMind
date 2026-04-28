@@ -528,6 +528,7 @@ export function useMeetings() {
         if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
         let raw: string;
         let visualContext = ""; // hoisted so newMeeting can reference it
+        let savedFrames: { dataUrl: string; timestamp: number }[] | undefined;
         if (typeof input === "string") {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
@@ -548,7 +549,6 @@ export function useMeetings() {
           const GROQ_LIMIT = 25 * 1024 * 1024;
           const transcriptParts: string[] = [];
           const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
-          let savedFrames: { dataUrl: string; timestamp: number }[] | undefined;
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
