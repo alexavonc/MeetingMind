@@ -337,6 +337,31 @@ export async function analyzeVisuals(
   }
 }
 
+export async function genPointers(
+  apiKey: string,
+  transcript: Utterance[],
+  speakers: Record<string, string>
+): Promise<string> {
+  const text = transcript
+    .map((u) => `[${u.t}] ${speakers[u.s] ?? u.s}: ${u.text}`)
+    .join("\n");
+
+  const prompt = `Extract every key point, fact, decision, and notable statement from this meeting transcript as a dense chronological bullet list.
+
+Rules:
+- One bullet per distinct idea
+- Preserve chronological order — do NOT regroup by topic
+- Format each bullet as: "• [timestamp] Speaker — point"
+- Be thorough: include every significant statement, number, decision, or named concept
+- Skip pure filler, repeated ideas, and social pleasantries
+- Return ONLY the bullet list — no headers, no intro text, no JSON
+
+TRANSCRIPT:
+${text}`;
+
+  return callClaude(apiKey, prompt, 3000);
+}
+
 export async function genFlow(
   apiKey: string,
   meeting: Pick<Meeting, "title" | "summary" | "transcript" | "speakers">

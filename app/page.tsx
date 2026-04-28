@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings, List } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "./components/Sidebar";
@@ -15,12 +15,13 @@ import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
 import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
+import PointersView from "./components/PointersView";
 import ProcessingSteps from "./components/ProcessingSteps";
 import CostModal from "./components/CostModal";
 import { estimateMeetingCost, formatUSD } from "@/lib/costs";
 import type { Folder } from "@/types";
 
-type Tab = "transcript" | "summary" | "flowchart";
+type Tab = "transcript" | "pointers" | "summary" | "flowchart";
 
 function AudioBar({
   audioUrl,
@@ -83,6 +84,7 @@ function AudioBar({
 
 const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
   { value: "transcript", label: "Transcript", icon: <FileAudio className="w-4 h-4" /> },
+  { value: "pointers", label: "Pointers", icon: <List className="w-4 h-4" /> },
   { value: "summary", label: "Summary", icon: <AlignLeft className="w-4 h-4" /> },
   { value: "flowchart", label: "Flowchart", icon: <GitBranch className="w-4 h-4" /> },
 ];
@@ -331,6 +333,8 @@ export default function Home() {
                 </div>
               ) : activeTab === "transcript" ? (
                 <TranscriptView meeting={selectedMeeting} />
+              ) : activeTab === "pointers" ? (
+                <PointersView meeting={selectedMeeting} />
               ) : activeTab === "summary" ? (
                 <SummaryView
                   meeting={selectedMeeting}

@@ -3,6 +3,12 @@
 import type { Meeting } from "@/types";
 import MarkdownSummary from "@/app/components/MarkdownSummary";
 
+function fmtSeconds(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
 interface Props {
   meeting: Meeting;
   onToggleAction: (idx: number) => void;
@@ -91,6 +97,37 @@ export default function SummaryView({ meeting, onToggleAction }: Props) {
               >
                 {name}
               </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Attachments — keyframes captured from video */}
+      {meeting.frames && meeting.frames.length > 0 && (
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            Attachments
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {meeting.frames.map((frame, i) => (
+              <a
+                key={i}
+                href={frame.dataUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-colors"
+              >
+                <img
+                  src={frame.dataUrl}
+                  alt={`Screen capture at ${fmtSeconds(frame.timestamp)}`}
+                  className="w-full object-cover"
+                />
+                <div className="px-2.5 py-1.5 bg-secondary/40 group-hover:bg-secondary/70 transition-colors">
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    {fmtSeconds(frame.timestamp)}
+                  </span>
+                </div>
+              </a>
             ))}
           </div>
         </section>

@@ -5,7 +5,7 @@ import type { Meeting, Settings, Folder, ProcessingState } from "@/types";
 import { loadDB, saveDB, loadSettings, saveSettings } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
 import { SEED_MEETINGS } from "@/lib/seeds";
-import { diarise, summarise, genFlow, notesToMeeting, analyzeVisuals } from "@/lib/claude";
+import { diarise, summarise, genFlow, genPointers, notesToMeeting, analyzeVisuals } from "@/lib/claude";
 import { transcribeAudio } from "@/lib/whisper";
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -45,6 +45,25 @@ async function dbDelete(id: string) {
   const sb = getSupabase();
   if (!sb) return;
   await sb.from("meetings").delete().eq("id", id);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Re-encode a base64 JPEG dataUrl to a smaller size for storage. */
+function compressFrame(dataUrl: string, width: number, quality: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const h = Math.round(width * (img.height / img.width));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: return original
+    img.src = dataUrl;
+  });
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -529,6 +548,7 @@ export function useMeetings() {
           const GROQ_LIMIT = 25 * 1024 * 1024;
           const transcriptParts: string[] = [];
           const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+          let savedFrames: { dataUrl: string; timestamp: number }[] | undefined;
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
@@ -574,6 +594,15 @@ export function useMeetings() {
                   setProcessing({ active: true, step: "transcribing", error: null, detail: `Analyzing ${frames.length} frames with Claude Vision…` });
                   const notes = await analyzeVisuals(settings.claudeKey, frames);
                   if (notes) visualContext += notes + "\n";
+
+                  // Compress and save up to 5 keyframes for the Attachments section
+                  const toSave = frames.slice(0, 5);
+                  savedFrames = await Promise.all(
+                    toSave.map(async (fr) => ({
+                      dataUrl: await compressFrame(fr.dataUrl, 400, 0.6),
+                      timestamp: fr.timestamp,
+                    }))
+                  );
                 }
               } catch { /* non-critical */ }
             } else {
@@ -643,7 +672,10 @@ export function useMeetings() {
           summary, actions, flow: "",
         } as Meeting;
 
-        const flow = await genFlow(settings.claudeKey, tmpMeeting);
+        const [flow, pointers] = await Promise.all([
+          genFlow(settings.claudeKey, tmpMeeting),
+          genPointers(settings.claudeKey, diarised.transcript, diarised.speakers).catch(() => ""),
+        ]);
         setProcessing({ active: true, step: "saving", error: null });
 
         // Upload audio to Supabase Storage (single file only, best-effort)
@@ -674,6 +706,8 @@ export function useMeetings() {
           flow,
           ...(audioUrl ? { audiourl: audioUrl } : {}),
           ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
+          ...(savedFrames ? { frames: savedFrames } : {}),
+          ...(pointers ? { pointers } : {}),
         };
 
         setMeetings((prev) => {
