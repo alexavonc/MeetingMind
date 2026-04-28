@@ -495,16 +495,27 @@ export function useMeetings() {
 
           // ── Video files: extract audio track + analyze keyframes ────────────
           const audioFiles: File[] = [];
+          const GROQ_LIMIT = 25 * 1024 * 1024;
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
-              // Extract audio from video (decodeAudioData works on video files)
-              setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio from video…" });
-              const { splitAudioFile } = await import("@/lib/splitAudio");
-              const audioChunks = await splitAudioFile(f, (detail) =>
-                setProcessing({ active: true, step: "transcribing", error: null, detail })
-              );
-              audioFiles.push(...audioChunks);
+              // Whisper accepts mp4/webm directly — only run Web Audio extraction
+              // if the file exceeds the 25 MB API limit (extraction also splits it).
+              // Web Audio decodeAudioData fails on iOS for large/unsupported files.
+              if (f.size <= GROQ_LIMIT) {
+                audioFiles.push(f);
+              } else {
+                try {
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio from video…" });
+                  const { splitAudioFile } = await import("@/lib/splitAudio");
+                  const audioChunks = await splitAudioFile(f, (detail) =>
+                    setProcessing({ active: true, step: "transcribing", error: null, detail })
+                  );
+                  audioFiles.push(...audioChunks);
+                } catch {
+                  throw new Error("Could not extract audio from this video file. Try a smaller file or convert to mp3/m4a first.");
+                }
+              }
 
               // Extract + analyze keyframes for visual context (non-critical)
               try {
@@ -524,10 +535,7 @@ export function useMeetings() {
             }
           }
 
-          // ── Split + transcribe each file sequentially to minimise peak memory ─
-          // (splitting all files first then transcribing would hold all decoded
-          //  audio in memory simultaneously, crashing mobile browser tabs)
-          const GROQ_LIMIT = 25 * 1024 * 1024;
+
           const parts: string[] = [];
           let globalPartIdx = 0;
 
