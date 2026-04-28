@@ -143,6 +143,29 @@ export function useMeetings() {
       setMeetings(remote);
       syncFolders(remote);
     });
+
+    // Real-time subscription so meetings sync instantly across devices/tabs
+    let channel: ReturnType<NonNullable<typeof sb>["channel"]> | null = null;
+    if (sb) {
+      channel = sb
+        .channel("meetings-sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "meetings" },
+          async () => {
+            const refreshed = await dbLoad();
+            if (refreshed) {
+              setMeetings(refreshed);
+              syncFolders(refreshed);
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (sb && channel) sb.removeChannel(channel);
+    };
   }, []);
 
   const persistMeetings = useCallback((updated: Meeting[]) => {
