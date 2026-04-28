@@ -493,29 +493,48 @@ export function useMeetings() {
           const isVideoFile = (f: File) =>
             f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
 
-          // ── Video files: server-side FFmpeg extraction + keyframe analysis ────
-          // Client-side Web Audio decodeAudioData fails on iOS for large videos.
-          // Server extracts audio at 32kbps mono → 40 min ≈ 10 MB, no splitting needed.
+          // ── Video files: chunked upload → server-side FFmpeg + Whisper ─────────
+          // Chunks are plain binary slices (File.slice) — no in-browser decoding.
+          // Server appends each chunk, runs FFmpeg on the last one, returns transcript.
           const audioFiles: File[] = [];
           const GROQ_LIMIT = 25 * 1024 * 1024;
           const transcriptParts: string[] = [];
+          const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
-              setProcessing({ active: true, step: "transcribing", error: null, detail: "Uploading video for server processing…" });
-              const form = new FormData();
-              form.append("file", f);
-              form.append("whisperKey", settings.whisperKey);
-              form.append("provider", settings.transcriptionProvider);
-              const res = await fetch("/api/video-process", { method: "POST", body: form });
-              if (!res.ok) {
-                const { error } = await res.json() as { error: string };
-                throw new Error(error || "Video processing failed");
-              }
-              const { text } = await res.json() as { text: string };
-              transcriptParts.push(text);
+              const uploadId = crypto.randomUUID();
+              const totalChunks = Math.ceil(f.size / CHUNK_SIZE);
 
-              // Keyframe analysis for visual context (non-critical, skipped if too slow)
+              for (let i = 0; i < totalChunks; i++) {
+                setProcessing({
+                  active: true, step: "transcribing", error: null,
+                  detail: `Uploading video… chunk ${i + 1} of ${totalChunks}`,
+                });
+                const chunk = f.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                const form = new FormData();
+                form.append("chunk", chunk);
+                form.append("uploadId", uploadId);
+                form.append("chunkIndex", String(i));
+                form.append("totalChunks", String(totalChunks));
+                if (i === totalChunks - 1) {
+                  // Processing happens on final chunk — pass keys
+                  form.append("whisperKey", settings.whisperKey);
+                  form.append("provider", settings.transcriptionProvider);
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio + transcribing…" });
+                }
+                const res = await fetch("/api/video-upload", { method: "POST", body: form });
+                if (!res.ok) {
+                  const { error } = await res.json() as { error: string };
+                  throw new Error(error || "Video upload failed");
+                }
+                if (i === totalChunks - 1) {
+                  const { text } = await res.json() as { text: string };
+                  transcriptParts.push(text);
+                }
+              }
+
+              // Keyframe analysis for visual context (non-critical)
               try {
                 setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
                 const { extractKeyframes } = await import("@/lib/extractVideoFrames");
