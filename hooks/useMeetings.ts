@@ -334,12 +334,18 @@ export function useMeetings() {
   const generateShareLink = useCallback(async (meetingId: string): Promise<string> => {
     const meeting = meetings.find((m) => m.id === meetingId);
     if (!meeting) throw new Error("Meeting not found");
-    let token = meeting.sharetoken;
-    if (!token) {
-      token = crypto.randomUUID();
-      setMeetings((prev) => prev.map((m) => m.id === meetingId ? { ...m, sharetoken: token! } : m));
-      await dbUpdate(meetingId, { sharetoken: token });
+    // Use server-side route so service role key bypasses RLS on the update
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meetingId }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json() as { error: string };
+      throw new Error(error || "Failed to generate share link");
     }
+    const { token } = await res.json() as { token: string };
+    setMeetings((prev) => prev.map((m) => m.id === meetingId ? { ...m, sharetoken: token } : m));
     return `${window.location.origin}/share/${token}`;
   }, [meetings]);
 
