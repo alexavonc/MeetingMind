@@ -22,6 +22,7 @@ import {
 import Dagre from "@dagrejs/dagre";
 import { RefreshCw } from "lucide-react";
 import type { Meeting } from "@/types";
+import PointersView from "@/app/components/PointersView";
 
 interface RawNode { id: string; label: string; type?: string }
 interface RawEdge { source: string; target: string; label?: string; id?: string }
@@ -200,6 +201,7 @@ interface Props {
 export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"summary" | "detail">("summary");
 
   const flowData = useMemo(() => parseFlow(meeting.flow ?? ""), [meeting.flow]);
 
@@ -227,9 +229,34 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">Auto-generated from meeting content</p>
-        {hasApiKey && (
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* View toggle */}
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("summary")}
+            className={`px-3 py-1.5 font-medium transition-colors ${
+              viewMode === "summary"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Summary
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("detail")}
+            className={`px-3 py-1.5 font-medium transition-colors border-l border-border ${
+              viewMode === "detail"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Point-by-Point
+          </button>
+        </div>
+
+        {hasApiKey && viewMode === "summary" && (
           <button
             type="button"
             onClick={handleRegenerate}
@@ -256,7 +283,9 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
         </div>
       )}
 
-      {flowData && nodes.length > 0 ? (
+      {viewMode === "detail" ? (
+        <PointersView meeting={meeting} />
+      ) : flowData && nodes.length > 0 ? (
         <div className="w-full rounded-xl border border-border overflow-hidden" style={{ height: "min(460px, 65vh)" }}>
           <ReactFlow
             nodes={nodes}

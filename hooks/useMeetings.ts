@@ -607,7 +607,7 @@ export function useMeetings() {
                   // Compress and upload up to 5 keyframes to Supabase Storage
                   setProcessing({ active: true, step: "transcribing", error: null, detail: "Saving frame screenshots…" });
                   try {
-                    const toSave = frames.slice(0, 5);
+                    const toSave = frames; // all unique screens
                     const compressed = await Promise.all(
                       toSave.map(async (fr) => ({
                         dataUrl: await compressFrame(fr.dataUrl, 400, 0.6),

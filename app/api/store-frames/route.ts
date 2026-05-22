@@ -15,22 +15,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing meetingId or frames" }, { status: 400 });
     }
 
-    const results: { url: string; timestamp: number }[] = [];
+    // Upload all frames in parallel
+    const uploads = await Promise.allSettled(
+      frames.map(async (frame) => {
+        const base64 = frame.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64, "base64");
+        const path = `${meetingId}/frame-${Math.round(frame.timestamp)}.jpg`;
 
-    for (const frame of frames) {
-      const base64 = frame.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64, "base64");
-      const path = `${meetingId}/frame-${Math.round(frame.timestamp)}.jpg`;
+        const { error } = await sb.storage
+          .from("recordings")
+          .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
 
-      const { error } = await sb.storage
-        .from("recordings")
-        .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
+        if (error) return null;
 
-      if (error) continue; // skip individual failures silently
+        const { data } = sb.storage.from("recordings").getPublicUrl(path);
+        return { url: data.publicUrl, timestamp: frame.timestamp };
+      })
+    );
 
-      const { data } = sb.storage.from("recordings").getPublicUrl(path);
-      results.push({ url: data.publicUrl, timestamp: frame.timestamp });
-    }
+    const results = uploads
+      .filter((r) => r.status === "fulfilled" && r.value !== null)
+      .map((r) => (r as PromiseFulfilledResult<{ url: string; timestamp: number }>).value);
 
     return NextResponse.json({ frameUrls: results });
   } catch (err) {
