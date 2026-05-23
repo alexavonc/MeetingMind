@@ -115,6 +115,7 @@ export default function Home() {
     deleteMeeting,
     generateShareLink,
     regenerateFlow,
+    regeneratePointers,
     processNotes,
     processUpload,
   } = useMeetings();
@@ -344,6 +345,7 @@ export default function Home() {
                 <FlowchartView
                   meeting={selectedMeeting}
                   onRegenerate={() => regenerateFlow(selectedMeeting.id)}
+                  onRegeneratePointers={() => regeneratePointers(selectedMeeting.id)}
                   hasApiKey={!!settings.claudeKey}
                 />
               )}

@@ -418,6 +418,25 @@ export function useMeetings() {
     }
   }, [meetings, settings.claudeKey]);
 
+  const regeneratePointers = useCallback(async (meetingId: string) => {
+    if (!settings.claudeKey) throw new Error("Claude API key not set");
+    const meeting = meetings.find((m) => m.id === meetingId);
+    if (!meeting?.transcript?.length) return;
+
+    const { groups, flat } = await genPointers(settings.claudeKey, meeting.transcript, meeting.speakers);
+    if (!flat && !groups) return;
+    const patch: Partial<Meeting> = {
+      ...(flat ? { pointers: flat } : {}),
+      ...(groups ? { pointgroups: groups } : {}),
+    };
+    setMeetings((prev) => {
+      const updated = prev.map((m) => m.id === meetingId ? { ...m, ...patch } : m);
+      saveDB(updated);
+      return updated;
+    });
+    await dbUpdate(meetingId, patch);
+  }, [meetings, settings.claudeKey]);
+
   const renameFolder = useCallback((oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
@@ -794,6 +813,7 @@ export function useMeetings() {
     deleteMeeting,
     generateShareLink,
     regenerateFlow,
+    regeneratePointers,
     processNotes,
     processUpload,
   };

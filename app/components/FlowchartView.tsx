@@ -195,11 +195,13 @@ const EDGE_TYPES: EdgeTypes = { verticalLabel: VerticalLabelEdge };
 interface Props {
   meeting: Meeting;
   onRegenerate: () => Promise<void>;
+  onRegeneratePointers: () => Promise<void>;
   hasApiKey: boolean;
 }
 
-export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Props) {
+export default function FlowchartView({ meeting, onRegenerate, onRegeneratePointers, hasApiKey }: Props) {
   const [loading, setLoading] = useState(false);
+  const [pointersLoading, setPointersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"summary" | "detail">("summary");
 
@@ -267,6 +269,26 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
           >
             <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
             {loading ? "Regenerating…" : "Regenerate"}
+          </button>
+        )}
+
+        {hasApiKey && viewMode === "detail" && !meeting.pointgroups && (
+          <button
+            type="button"
+            onClick={async () => {
+              setPointersLoading(true);
+              setError(null);
+              try { await onRegeneratePointers(); }
+              catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+              finally { setPointersLoading(false); }
+            }}
+            disabled={pointersLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
+              bg-secondary hover:bg-secondary/80 text-foreground border border-border
+              transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${pointersLoading ? "animate-spin" : ""}`} />
+            {pointersLoading ? "Generating…" : "Generate grouped view"}
           </button>
         )}
       </div>
