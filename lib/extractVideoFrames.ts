@@ -14,9 +14,9 @@ export interface VideoFrame {
   timestamp: number;  // seconds from start
 }
 
-const SAMPLE_INTERVAL = 15;  // sample one frame every N seconds
+const SAMPLE_INTERVAL = 5;   // sample one frame every N seconds
 const DIFF_THRESHOLD = 0.04; // 4% of pixels changed = new unique frame
-const MAX_FRAMES = 10;       // cap to keep Claude Vision cost reasonable
+const MAX_FRAMES = 60;       // full video coverage — up to 60 unique screens
 const OUTPUT_WIDTH = 640;
 
 export async function extractKeyframes(

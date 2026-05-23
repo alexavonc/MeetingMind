@@ -5,7 +5,7 @@ import type { Meeting, Settings, Folder, ProcessingState } from "@/types";
 import { loadDB, saveDB, loadSettings, saveSettings } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
 import { SEED_MEETINGS } from "@/lib/seeds";
-import { diarise, summarise, genFlow, notesToMeeting, analyzeVisuals } from "@/lib/claude";
+import { diarise, summarise, genFlow, genPointers, notesToMeeting, analyzeVisuals } from "@/lib/claude";
 import { transcribeAudio } from "@/lib/whisper";
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
@@ -25,7 +25,15 @@ async function dbUpsert(meeting: Meeting, userId?: string) {
   const sb = getSupabase();
   if (!sb) return;
   const row = userId ? { ...meeting, user_id: userId } : meeting;
-  await sb.from("meetings").upsert(row);
+  const { error } = await sb.from("meetings").upsert(row);
+  if (error) {
+    // Columns like frameurls/pointers may not exist yet — retry with core fields only
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { frameurls, pointers, visualnotes, ...coreRow } = row as typeof row & {
+      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown;
+    };
+    await sb.from("meetings").upsert(coreRow);
+  }
 }
 
 async function dbUpsertMany(meetings: Meeting[], userId?: string) {
@@ -45,6 +53,25 @@ async function dbDelete(id: string) {
   const sb = getSupabase();
   if (!sb) return;
   await sb.from("meetings").delete().eq("id", id);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Re-encode a base64 JPEG dataUrl to a smaller size for storage. */
+function compressFrame(dataUrl: string, width: number, quality: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const h = Math.round(width * (img.height / img.width));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl); // fallback: return original
+    img.src = dataUrl;
+  });
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -143,6 +170,29 @@ export function useMeetings() {
       setMeetings(remote);
       syncFolders(remote);
     });
+
+    // Real-time subscription so meetings sync instantly across devices/tabs
+    let channel: ReturnType<NonNullable<typeof sb>["channel"]> | null = null;
+    if (sb) {
+      channel = sb
+        .channel("meetings-sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "meetings" },
+          async () => {
+            const refreshed = await dbLoad();
+            if (refreshed) {
+              setMeetings(refreshed);
+              syncFolders(refreshed);
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (sb && channel) sb.removeChannel(channel);
+    };
   }, []);
 
   const persistMeetings = useCallback((updated: Meeting[]) => {
@@ -334,12 +384,18 @@ export function useMeetings() {
   const generateShareLink = useCallback(async (meetingId: string): Promise<string> => {
     const meeting = meetings.find((m) => m.id === meetingId);
     if (!meeting) throw new Error("Meeting not found");
-    let token = meeting.sharetoken;
-    if (!token) {
-      token = crypto.randomUUID();
-      setMeetings((prev) => prev.map((m) => m.id === meetingId ? { ...m, sharetoken: token! } : m));
-      await dbUpdate(meetingId, { sharetoken: token });
+    // Use server-side route so service role key bypasses RLS on the update
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meetingId }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json() as { error: string };
+      throw new Error(error || "Failed to generate share link");
     }
+    const { token } = await res.json() as { token: string };
+    setMeetings((prev) => prev.map((m) => m.id === meetingId ? { ...m, sharetoken: token } : m));
     return `${window.location.origin}/share/${token}`;
   }, [meetings]);
 
@@ -478,8 +534,10 @@ export function useMeetings() {
       await Promise.resolve(); // yield so React renders active:true before synchronous checks
       try {
         if (!settings.claudeKey) throw new Error("Claude API key not set — add it in Settings");
+        const meetingId = `meeting-${Date.now()}`;
         let raw: string;
         let visualContext = ""; // hoisted so newMeeting can reference it
+        let savedFrameUrls: { url: string; timestamp: number }[] | undefined;
         if (typeof input === "string") {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
@@ -493,20 +551,48 @@ export function useMeetings() {
           const isVideoFile = (f: File) =>
             f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
 
-          // ── Video files: extract audio track + analyze keyframes ────────────
+          // ── Video files: chunked upload → server-side FFmpeg + Whisper ─────────
+          // Chunks are plain binary slices (File.slice) — no in-browser decoding.
+          // Server appends each chunk, runs FFmpeg on the last one, returns transcript.
           const audioFiles: File[] = [];
+          const GROQ_LIMIT = 25 * 1024 * 1024;
+          const transcriptParts: string[] = [];
+          const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 
           for (const f of rawFiles) {
             if (isVideoFile(f)) {
-              // Extract audio from video (decodeAudioData works on video files)
-              setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio from video…" });
-              const { splitAudioFile } = await import("@/lib/splitAudio");
-              const audioChunks = await splitAudioFile(f, (detail) =>
-                setProcessing({ active: true, step: "transcribing", error: null, detail })
-              );
-              audioFiles.push(...audioChunks);
+              const uploadId = crypto.randomUUID();
+              const totalChunks = Math.ceil(f.size / CHUNK_SIZE);
 
-              // Extract + analyze keyframes for visual context (non-critical)
+              for (let i = 0; i < totalChunks; i++) {
+                setProcessing({
+                  active: true, step: "transcribing", error: null,
+                  detail: `Uploading video… chunk ${i + 1} of ${totalChunks}`,
+                });
+                const chunk = f.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                const form = new FormData();
+                form.append("chunk", chunk);
+                form.append("uploadId", uploadId);
+                form.append("chunkIndex", String(i));
+                form.append("totalChunks", String(totalChunks));
+                if (i === totalChunks - 1) {
+                  // Processing happens on final chunk — pass keys
+                  form.append("whisperKey", settings.whisperKey);
+                  form.append("provider", settings.transcriptionProvider);
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio + transcribing…" });
+                }
+                const res = await fetch("/api/video-upload", { method: "POST", body: form });
+                if (!res.ok) {
+                  const { error } = await res.json() as { error: string };
+                  throw new Error(error || "Video upload failed");
+                }
+                if (i === totalChunks - 1) {
+                  const { text } = await res.json() as { text: string };
+                  transcriptParts.push(text);
+                }
+              }
+
+              // Keyframe analysis for visual context (non-critical)
               try {
                 setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
                 const { extractKeyframes } = await import("@/lib/extractVideoFrames");
@@ -517,44 +603,67 @@ export function useMeetings() {
                   setProcessing({ active: true, step: "transcribing", error: null, detail: `Analyzing ${frames.length} frames with Claude Vision…` });
                   const notes = await analyzeVisuals(settings.claudeKey, frames);
                   if (notes) visualContext += notes + "\n";
+
+                  // Upload frames to Supabase Storage at original extraction quality (640px)
+                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Saving frame screenshots…" });
+                  try {
+                    const toSave = frames.map((fr) => ({
+                      dataUrl: fr.dataUrl,
+                      timestamp: fr.timestamp,
+                    }));
+                    const res = await fetch("/api/store-frames", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ meetingId, frames: toSave }),
+                    });
+                    if (res.ok) {
+                      const { frameUrls } = await res.json() as { frameUrls: { url: string; timestamp: number }[] };
+                      if (frameUrls?.length) savedFrameUrls = frameUrls;
+                    }
+                  } catch { /* non-critical */ }
                 }
-              } catch { /* non-critical — continue without visual context */ }
+              } catch { /* non-critical */ }
             } else {
               audioFiles.push(f);
             }
           }
 
-          // ── Auto-split any audio file that exceeds Groq's 25 MB limit ───────
-          const GROQ_LIMIT = 25 * 1024 * 1024;
-          const fileList: File[] = [];
+
+          const parts: string[] = [];
+          let globalPartIdx = 0;
+
           for (const f of audioFiles) {
+            let chunks: File[];
             if (f.size > GROQ_LIMIT) {
-              setProcessing({ active: true, step: "transcribing", error: null, detail: "Splitting large file…" });
+              setProcessing({ active: true, step: "transcribing", error: null, detail: `Splitting ${f.name}…` });
               const { splitAudioFile } = await import("@/lib/splitAudio");
-              const parts = await splitAudioFile(f, (detail) =>
+              chunks = await splitAudioFile(f, (detail) =>
                 setProcessing({ active: true, step: "transcribing", error: null, detail })
               );
-              fileList.push(...parts);
             } else {
-              fileList.push(f);
+              chunks = [f];
+            }
+
+            for (const chunk of chunks) {
+              globalPartIdx++;
+              setProcessing({
+                active: true, step: "transcribing", error: null,
+                detail: audioFiles.length > 1 || chunks.length > 1
+                  ? `File ${audioFiles.indexOf(f) + 1}/${audioFiles.length} · part ${globalPartIdx}`
+                  : undefined,
+              });
+              const part = await transcribeAudio(
+                settings.whisperKey, chunk, settings.transcriptionProvider,
+                settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
+              );
+              parts.push(part);
             }
           }
 
-          const parts: string[] = [];
-          for (let i = 0; i < fileList.length; i++) {
-            setProcessing({
-              active: true, step: "transcribing", error: null,
-              detail: fileList.length > 1 ? `Part ${i + 1} of ${fileList.length}` : undefined,
-            });
-            const part = await transcribeAudio(
-              settings.whisperKey, fileList[i], settings.transcriptionProvider,
-              settings.hfToken ?? "", settings.hfEndpointUrl ?? ""
-            );
-            parts.push(part);
-          }
-          raw = parts.length === 1
-            ? parts[0]
-            : parts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
+          const allParts = [...transcriptParts, ...parts];
+          raw = allParts.length === 1
+            ? allParts[0]
+            : allParts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
 
           // Prepend visual context from video frames so Claude incorporates it
           if (visualContext) {
@@ -572,8 +681,6 @@ export function useMeetings() {
         );
         setProcessing({ active: true, step: "flowcharting", error: null });
 
-        const meetingId = `meeting-${Date.now()}`;
-
         const tmpMeeting = {
           id: meetingId, title, folder, date: "", duration: "",
           languages: [] as Meeting["languages"],
@@ -581,26 +688,13 @@ export function useMeetings() {
           summary, actions, flow: "",
         } as Meeting;
 
+        // Start pointers immediately — fire-and-forget so it doesn't gate saving
+        const pointersPromise = genPointers(settings.claudeKey, diarised.transcript, diarised.speakers)
+          .catch(() => "");
+
+        setProcessing({ active: true, step: "flowcharting", error: null });
         const flow = await genFlow(settings.claudeKey, tmpMeeting);
         setProcessing({ active: true, step: "saving", error: null });
-
-        // Upload audio to Supabase Storage (single file only, best-effort)
-        let audioUrl: string | undefined;
-        if (typeof input !== "string") {
-          const fileList = Array.isArray(input) ? input : [input];
-          if (fileList.length === 1) {
-            try {
-              const form = new FormData();
-              form.append("file", fileList[0]);
-              form.append("meetingId", meetingId);
-              const res = await fetch("/api/store-audio", { method: "POST", body: form });
-              if (res.ok) {
-                const { url } = (await res.json()) as { url: string };
-                audioUrl = url;
-              }
-            } catch { /* non-critical */ }
-          }
-        }
 
         const newMeeting: Meeting = {
           ...tmpMeeting,
@@ -610,20 +704,58 @@ export function useMeetings() {
           duration: `${Math.ceil(diarised.transcript.length * 0.5)} min`,
           languages: detectLanguages(diarised.transcript),
           flow,
-          ...(audioUrl ? { audiourl: audioUrl } : {}),
           ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
+          ...(savedFrameUrls ? { frameurls: savedFrameUrls } : {}),
+          // pointers added via background update below
         };
 
+        // Save to DB immediately — don't wait for audio upload or pointers
         setMeetings((prev) => {
           const updated = [newMeeting, ...prev];
           saveDB(updated);
           return updated;
         });
-        await dbUpsert(newMeeting, userId ?? undefined); // save to Supabase with user_id
+        await dbUpsert(newMeeting, userId ?? undefined);
 
         setSelectedFolder(folder);
         setSelectedId(newMeeting.id);
         setProcessing({ active: false, step: "done", error: null });
+
+        // Background: upload audio then patch the row
+        if (typeof input !== "string") {
+          const fileList = Array.isArray(input) ? input : [input];
+          if (fileList.length === 1) {
+            (async () => {
+              try {
+                const form = new FormData();
+                form.append("file", fileList[0]);
+                form.append("meetingId", meetingId);
+                const res = await fetch("/api/store-audio", { method: "POST", body: form });
+                if (res.ok) {
+                  const { url } = (await res.json()) as { url: string };
+                  setMeetings((prev) => {
+                    const updated = prev.map((m) => m.id === meetingId ? { ...m, audiourl: url } : m);
+                    saveDB(updated);
+                    return updated;
+                  });
+                  dbUpdate(meetingId, { audiourl: url });
+                }
+              } catch { /* non-critical */ }
+            })();
+          }
+        }
+
+        // Background: update meeting with pointers when ready
+        pointersPromise.then(async (pointers) => {
+          if (!pointers) return;
+          setMeetings((prev) => {
+            const updated = prev.map((m) => m.id === meetingId ? { ...m, pointers } : m);
+            saveDB(updated);
+            return updated;
+          });
+          await dbUpdate(meetingId, { pointers });
+        });
+
         return newMeeting;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -631,7 +763,7 @@ export function useMeetings() {
         throw err;
       }
     },
-    [settings]
+    [settings, userId]
   );
 
   const selectedMeeting = meetings.find((m) => m.id === selectedId) ?? null;
