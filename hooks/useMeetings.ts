@@ -604,20 +604,17 @@ export function useMeetings() {
                   const notes = await analyzeVisuals(settings.claudeKey, frames);
                   if (notes) visualContext += notes + "\n";
 
-                  // Compress and upload up to 5 keyframes to Supabase Storage
+                  // Upload frames to Supabase Storage at original extraction quality (640px)
                   setProcessing({ active: true, step: "transcribing", error: null, detail: "Saving frame screenshots…" });
                   try {
-                    const toSave = frames; // all unique screens
-                    const compressed = await Promise.all(
-                      toSave.map(async (fr) => ({
-                        dataUrl: await compressFrame(fr.dataUrl, 400, 0.6),
-                        timestamp: fr.timestamp,
-                      }))
-                    );
+                    const toSave = frames.map((fr) => ({
+                      dataUrl: fr.dataUrl,
+                      timestamp: fr.timestamp,
+                    }));
                     const res = await fetch("/api/store-frames", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ meetingId, frames: compressed }),
+                      body: JSON.stringify({ meetingId, frames: toSave }),
                     });
                     if (res.ok) {
                       const { frameUrls } = await res.json() as { frameUrls: { url: string; timestamp: number }[] };

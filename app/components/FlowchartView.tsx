@@ -22,7 +22,7 @@ import {
 import Dagre from "@dagrejs/dagre";
 import { RefreshCw } from "lucide-react";
 import type { Meeting } from "@/types";
-import PointersView from "@/app/components/PointersView";
+import PointByPointFlowView from "@/app/components/PointByPointFlowView";
 
 interface RawNode { id: string; label: string; type?: string }
 interface RawEdge { source: string; target: string; label?: string; id?: string }
@@ -284,7 +284,7 @@ export default function FlowchartView({ meeting, onRegenerate, hasApiKey }: Prop
       )}
 
       {viewMode === "detail" ? (
-        <PointersView meeting={meeting} />
+        <PointByPointFlowView meeting={meeting} />
       ) : flowData && nodes.length > 0 ? (
         <div className="w-full rounded-xl border border-border overflow-hidden" style={{ height: "min(460px, 65vh)" }}>
           <ReactFlow
