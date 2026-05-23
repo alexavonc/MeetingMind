@@ -31,6 +31,7 @@ export interface Meeting {
   visualnotes?: string; // visual context extracted from video frames (if uploaded as video)
   frameurls?: { url: string; timestamp: number }[]; // keyframe screenshots in Supabase Storage
   pointers?: string;    // chronological bullet-point list of every key statement
+  pointgroups?: string; // JSON: grouped version of pointers for hierarchical flowchart view
 }
 
 export type TranscriptionProvider = "openai" | "groq" | "huggingface";

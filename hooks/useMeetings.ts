@@ -27,10 +27,10 @@ async function dbUpsert(meeting: Meeting, userId?: string) {
   const row = userId ? { ...meeting, user_id: userId } : meeting;
   const { error } = await sb.from("meetings").upsert(row);
   if (error) {
-    // Columns like frameurls/pointers may not exist yet — retry with core fields only
+    // Columns like frameurls/pointers/pointgroups may not exist yet — retry with core fields
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { frameurls, pointers, visualnotes, ...coreRow } = row as typeof row & {
-      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown;
+    const { frameurls, pointers, visualnotes, pointgroups, ...coreRow } = row as typeof row & {
+      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown; pointgroups?: unknown;
     };
     await sb.from("meetings").upsert(coreRow);
   }
@@ -690,7 +690,7 @@ export function useMeetings() {
 
         // Start pointers immediately — fire-and-forget so it doesn't gate saving
         const pointersPromise = genPointers(settings.claudeKey, diarised.transcript, diarised.speakers)
-          .catch(() => "");
+          .catch(() => ({ groups: "", flat: "" }));
 
         setProcessing({ active: true, step: "flowcharting", error: null });
         const flow = await genFlow(settings.claudeKey, tmpMeeting);
@@ -745,15 +745,19 @@ export function useMeetings() {
           }
         }
 
-        // Background: update meeting with pointers when ready
-        pointersPromise.then(async (pointers) => {
-          if (!pointers) return;
+        // Background: update meeting with pointers (flat + grouped) when ready
+        pointersPromise.then(async ({ groups, flat }) => {
+          if (!flat && !groups) return;
+          const patch: Partial<Meeting> = {
+            ...(flat ? { pointers: flat } : {}),
+            ...(groups ? { pointgroups: groups } : {}),
+          };
           setMeetings((prev) => {
-            const updated = prev.map((m) => m.id === meetingId ? { ...m, pointers } : m);
+            const updated = prev.map((m) => m.id === meetingId ? { ...m, ...patch } : m);
             saveDB(updated);
             return updated;
           });
-          await dbUpdate(meetingId, { pointers });
+          await dbUpdate(meetingId, patch);
         });
 
         return newMeeting;

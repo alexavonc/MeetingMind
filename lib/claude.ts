@@ -341,25 +341,41 @@ export async function genPointers(
   apiKey: string,
   transcript: Utterance[],
   speakers: Record<string, string>
-): Promise<string> {
+): Promise<{ groups: string; flat: string }> {
   const text = transcript
     .map((u) => `[${u.t}] ${speakers[u.s] ?? u.s}: ${u.text}`)
     .join("\n");
 
-  const prompt = `Extract every key point, fact, decision, and notable statement from this meeting transcript as a dense chronological bullet list.
+  const prompt = `Analyze this meeting transcript and extract all key points, organized by main theme.
+
+Return ONLY valid JSON (no backticks, no markdown):
+{"groups":[{"title":"Theme Title","timestamp":"0:15","points":["• [0:15] Speaker — specific point","• [0:30] Speaker — another point"]}]}
 
 Rules:
-- One bullet per distinct idea
-- Preserve chronological order — do NOT regroup by topic
-- Format each bullet as: "• [timestamp] Speaker — point"
-- Be thorough: include every significant statement, number, decision, or named concept
-- Skip pure filler, repeated ideas, and social pleasantries
-- Return ONLY the bullet list — no headers, no intro text, no JSON
+- 4–8 groups total, each covering a distinct theme or phase of the meeting
+- Each group: 2–4 sub-points (more only if clearly needed)
+- Sub-point format exactly: "• [MM:SS] Speaker — concise statement"
+- Chronological order within each group
+- "timestamp" = timestamp of the first point in that group
+- Cover every significant statement, decision, number, or named concept
+- Skip filler, repeated ideas, and pleasantries
 
 TRANSCRIPT:
 ${text}`;
 
-  return callClaude(apiKey, prompt, 3000);
+  const raw = await callClaude(apiKey, prompt, 4000);
+  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  const toParse = jsonMatch ? jsonMatch[0] : cleaned;
+
+  try {
+    const data = JSON.parse(toParse) as { groups: Array<{ title: string; timestamp?: string; points: string[] }> };
+    const flat = data.groups.flatMap((g) => g.points).join("\n");
+    return { groups: toParse, flat };
+  } catch {
+    // Claude returned non-JSON — treat raw output as flat bullet list
+    return { groups: "", flat: raw };
+  }
 }
 
 export async function genFlow(

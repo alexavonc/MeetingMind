@@ -1,10 +1,27 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { Monitor } from "lucide-react";
 import type { Meeting } from "@/types";
 
 interface Props {
   meeting: Meeting;
+}
+
+interface PointGroup {
+  title: string;
+  timestamp?: string;
+  points: string[];
+}
+
+function parseGroups(json: string): PointGroup[] | null {
+  try {
+    const data = JSON.parse(json) as { groups: PointGroup[] };
+    if (!Array.isArray(data.groups)) return null;
+    return data.groups;
+  } catch {
+    return null;
+  }
 }
 
 function parseBullet(line: string) {
@@ -38,12 +55,79 @@ function activeFrameAt(
   return result;
 }
 
-type FlowItem =
-  | { kind: "screen"; url: string; timestamp: number }
-  | { kind: "point"; time: string | null; speaker: string | null; point: string };
+const ARROW: CSSProperties = {
+  width: 0,
+  height: 0,
+  borderLeft: "5px solid transparent",
+  borderRight: "5px solid transparent",
+  borderTop: "6px solid hsl(var(--border))",
+};
+
+function VArrow() {
+  return (
+    <div className="flex justify-center">
+      <div className="flex flex-col items-center">
+        <div className="w-px h-5 bg-border" />
+        <div style={ARROW} />
+      </div>
+    </div>
+  );
+}
+
+function Stem() {
+  return (
+    <div className="flex justify-center">
+      <div className="w-px h-5 bg-border" />
+    </div>
+  );
+}
+
+function ScreenCard({ url, timestamp }: { url: string; timestamp: number }) {
+  return (
+    <div className="mx-auto w-full max-w-lg rounded-xl border-2 border-primary/25 overflow-hidden bg-secondary/20 shadow-sm">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block group">
+        <img
+          src={url}
+          alt={`Screen at ${fmtSeconds(timestamp)}`}
+          className="w-full object-cover group-hover:opacity-90 transition-opacity"
+        />
+      </a>
+      <div className="px-3 py-1.5 flex items-center gap-1.5 bg-secondary/40">
+        <Monitor className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+        <span className="text-[11px] font-mono text-muted-foreground">{fmtSeconds(timestamp)}</span>
+      </div>
+    </div>
+  );
+}
+
+function SubPointCard({
+  time,
+  speaker,
+  point,
+}: {
+  time: string | null;
+  speaker: string | null;
+  point: string;
+}) {
+  return (
+    <div className="w-full rounded-lg border border-border bg-card px-2.5 py-2 shadow-sm">
+      {time && (
+        <div className="font-mono text-[10px] text-primary/60 mb-0.5 text-center">{time}</div>
+      )}
+      {speaker && (
+        <div className="text-[10px] font-semibold text-muted-foreground mb-0.5 text-center">
+          {speaker}
+        </div>
+      )}
+      <p className="text-[11px] text-foreground/90 leading-snug text-center">{point}</p>
+    </div>
+  );
+}
 
 export default function PointByPointFlowView({ meeting }: Props) {
-  if (!meeting.pointers) {
+  const groups = meeting.pointgroups ? parseGroups(meeting.pointgroups) : null;
+
+  if (!groups && !meeting.pointers) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
         <div className="w-5 h-5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
@@ -55,7 +139,98 @@ export default function PointByPointFlowView({ meeting }: Props) {
     );
   }
 
-  const lines = meeting.pointers
+  const frames = [...(meeting.frameurls ?? [])].sort((a, b) => a.timestamp - b.timestamp);
+  const hasFrames = frames.length > 0;
+  let lastShownUrl: string | null = null;
+
+  // ── Grouped hierarchical flowchart ────────────────────────────────────────
+  if (groups) {
+    return (
+      <div className="py-2 max-w-2xl mx-auto">
+        {groups.map((group, gi) => {
+          const parsed = group.points.map(parseBullet);
+          const groupTs = group.timestamp ?? parsed.find((p) => p.time)?.time ?? null;
+          const groupSecs = groupTs ? toSeconds(groupTs) : null;
+
+          const frame = hasFrames && groupSecs !== null ? activeFrameAt(frames, groupSecs) : null;
+          const showFrame = frame && frame.url !== lastShownUrl;
+          if (showFrame) lastShownUrl = frame!.url;
+
+          // Cap horizontal columns at 3 for readability
+          const cols = Math.min(Math.max(parsed.length, 1), 3);
+
+          return (
+            <div key={gi}>
+              {gi > 0 && <VArrow />}
+
+              {showFrame && (
+                <>
+                  <ScreenCard url={frame!.url} timestamp={frame!.timestamp} />
+                  <VArrow />
+                </>
+              )}
+
+              {/* Main theme bubble */}
+              <div className="mx-auto w-full max-w-lg rounded-xl border-2 border-primary/30 bg-primary/[0.07] px-5 py-3.5 shadow-sm text-center">
+                <p className="text-sm font-bold text-primary leading-snug">{group.title}</p>
+                {groupTs && (
+                  <span className="text-[10px] font-mono text-primary/50 mt-0.5 block">
+                    {groupTs}
+                  </span>
+                )}
+              </div>
+
+              {/* Sub-point cards branching below the bubble */}
+              {parsed.length > 0 && (
+                <div className="max-w-lg mx-auto">
+                  <Stem />
+
+                  {parsed.length === 1 ? (
+                    <>
+                      <div className="flex justify-center">
+                        <div style={ARROW} />
+                      </div>
+                      <div className="mt-1">
+                        <SubPointCard {...parsed[0]} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="relative">
+                      {/* Horizontal trunk line spanning from center of col-1 to center of col-N */}
+                      <div
+                        className="absolute top-0 h-px bg-border"
+                        style={{
+                          left: `${100 / (cols * 2)}%`,
+                          right: `${100 / (cols * 2)}%`,
+                        }}
+                      />
+                      <div
+                        className="grid gap-2"
+                        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+                      >
+                        {parsed.map((pt, pi) => (
+                          <div key={pi} className="flex flex-col items-center">
+                            <div className="w-px h-5 bg-border" />
+                            <div style={ARROW} />
+                            <div className="w-full mt-1">
+                              <SubPointCard {...pt} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Flat flow fallback (older meetings without pointgroups) ───────────────
+  const lines = meeting.pointers!
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => /^[•\-*]/.test(l) || /^\[\d+:\d+\]/.test(l));
@@ -66,64 +241,31 @@ export default function PointByPointFlowView({ meeting }: Props) {
     );
   }
 
-  const frames = [...(meeting.frameurls ?? [])].sort((a, b) => a.timestamp - b.timestamp);
-  const hasFrames = frames.length > 0;
-  let lastShownUrl: string | null = null;
+  type FlowItem =
+    | { kind: "screen"; url: string; timestamp: number }
+    | { kind: "point"; time: string | null; speaker: string | null; point: string };
 
-  // Build a flat list of items: screen cards + pointer cards in order
   const items: FlowItem[] = [];
   for (const line of lines) {
-    const parsed = parseBullet(line);
-    if (hasFrames && parsed.time) {
-      const frame = activeFrameAt(frames, toSeconds(parsed.time));
-      if (frame && frame.url !== lastShownUrl) {
-        lastShownUrl = frame.url;
-        items.push({ kind: "screen", url: frame.url, timestamp: frame.timestamp });
+    const p = parseBullet(line);
+    if (hasFrames && p.time) {
+      const f = activeFrameAt(frames, toSeconds(p.time));
+      if (f && f.url !== lastShownUrl) {
+        lastShownUrl = f.url;
+        items.push({ kind: "screen", url: f.url, timestamp: f.timestamp });
       }
     }
-    items.push({ kind: "point", ...parsed });
+    items.push({ kind: "point", ...p });
   }
 
   return (
     <div className="py-2">
       {items.map((item, i) => (
         <div key={i}>
-          {/* Connector arrow — not before the very first item */}
-          {i > 0 && (
-            <div className="flex justify-center">
-              <div className="flex flex-col items-center">
-                <div className="w-px h-5 bg-border" />
-                <div
-                  className="w-0 h-0"
-                  style={{
-                    borderLeft: "5px solid transparent",
-                    borderRight: "5px solid transparent",
-                    borderTop: "6px solid hsl(var(--border))",
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
+          {i > 0 && <VArrow />}
           {item.kind === "screen" ? (
-            /* ── Screenshot card ── */
-            <div className="mx-auto w-full max-w-lg rounded-xl border-2 border-primary/25 overflow-hidden bg-secondary/20 shadow-sm">
-              <a href={item.url} target="_blank" rel="noopener noreferrer" className="block group">
-                <img
-                  src={item.url}
-                  alt={`Screen at ${fmtSeconds(item.timestamp)}`}
-                  className="w-full object-cover group-hover:opacity-90 transition-opacity"
-                />
-              </a>
-              <div className="px-3 py-1.5 flex items-center gap-1.5 bg-secondary/40">
-                <Monitor className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  {fmtSeconds(item.timestamp)}
-                </span>
-              </div>
-            </div>
+            <ScreenCard url={item.url} timestamp={item.timestamp} />
           ) : (
-            /* ── Pointer card ── */
             <div className="mx-auto w-full max-w-lg rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
               <div className="flex items-start gap-2.5">
                 {item.time && (
