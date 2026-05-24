@@ -25,6 +25,58 @@ import type { Folder } from "@/types";
 
 type Tab = "transcript" | "pointers" | "summary" | "flowchart";
 
+function AttachVideoPrompt({
+  meetingId,
+  onAttach,
+}: {
+  meetingId: string;
+  onAttach: (meetingId: string, file: File, onProgress?: (d: string) => void) => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      await onAttach(meetingId, file, setProgress);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      setProgress("");
+    }
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 z-40">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="video/*,.mp4,.webm,.mov,.avi,.mkv,.m4v"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border
+          shadow-lg text-xs font-medium text-muted-foreground hover:text-foreground
+          hover:bg-secondary transition-colors disabled:opacity-60"
+      >
+        <span className="text-base">🎬</span>
+        {uploading ? (progress || "Uploading…") : "Attach video recording"}
+      </button>
+      {error && (
+        <p className="mt-1 text-[11px] text-destructive text-right max-w-[220px]">{error}</p>
+      )}
+    </div>
+  );
+}
+
 function AudioBar({
   audioUrl,
   onAttach,
@@ -112,6 +164,7 @@ export default function Home() {
     toggleAction,
     reprocessMeeting,
     attachAudio,
+    attachVideo,
     renameMeeting,
     moveMeeting,
     deleteMeeting,
@@ -491,6 +544,15 @@ export default function Home() {
           url={selectedMeeting.videourl}
           title={selectedMeeting.title}
           onClose={() => setVideoPlayerOpen(false)}
+        />
+      )}
+
+      {/* Attach video prompt — for video meetings that don't have a stored video yet */}
+      {selectedMeeting && !selectedMeeting.videourl &&
+        (selectedMeeting.frameurls?.length || selectedMeeting.visualnotes) && (
+        <AttachVideoPrompt
+          meetingId={selectedMeeting.id}
+          onAttach={attachVideo}
         />
       )}
     </div>

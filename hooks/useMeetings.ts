@@ -353,6 +353,43 @@ export function useMeetings() {
     dbUpdate(meetingId, { audiourl: url });
   }, []);
 
+  const attachVideo = useCallback(async (
+    meetingId: string,
+    file: File,
+    onProgress?: (detail: string) => void
+  ) => {
+    const CHUNK_SIZE = 5 * 1024 * 1024;
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = crypto.randomUUID();
+    const ext = file.name.split(".").pop() ?? "mp4";
+
+    for (let i = 0; i < totalChunks; i++) {
+      onProgress?.(`Uploading video… ${i + 1} / ${totalChunks}`);
+      const form = new FormData();
+      form.append("chunk", file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+      form.append("uploadId", uploadId);
+      form.append("chunkIndex", String(i));
+      form.append("totalChunks", String(totalChunks));
+      form.append("meetingId", meetingId);
+      form.append("fileExt", ext);
+
+      const res = await fetch("/api/store-video", { method: "POST", body: form });
+      if (!res.ok) {
+        const { error } = (await res.json()) as { error: string };
+        throw new Error(error || "Video upload failed");
+      }
+      if (i === totalChunks - 1) {
+        const { url } = (await res.json()) as { url: string };
+        setMeetings((prev) => {
+          const updated = prev.map((m) => m.id === meetingId ? { ...m, videourl: url } : m);
+          saveDB(updated);
+          return updated;
+        });
+        await dbUpdate(meetingId, { videourl: url });
+      }
+    }
+  }, []);
+
   const renameMeeting = useCallback((id: string, title: string) => {
     if (!title.trim()) return;
     setMeetings((prev) => {
@@ -870,6 +907,7 @@ export function useMeetings() {
     toggleAction,
     reprocessMeeting,
     attachAudio,
+    attachVideo,
     renameMeeting,
     renameSpeaker,
     reassignUtterance,
