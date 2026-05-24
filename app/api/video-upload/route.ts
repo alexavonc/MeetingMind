@@ -3,8 +3,8 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
-import { join, extname } from "path";
-import { getServerSupabase } from "@/lib/supabase";
+import { join } from "path";
+import { uploadToR2 } from "@/lib/r2";
 
 const execAsync = promisify(exec);
 export const maxDuration = 300;
@@ -13,8 +13,7 @@ const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const SG_PROMPT = "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.";
 
-// Max video file size to store in Supabase (500 MB) — skip silently if larger
-const MAX_VIDEO_STORE_BYTES = 500 * 1024 * 1024;
+const MAX_VIDEO_STORE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB — R2 has no per-file limit on free tier
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -75,27 +74,20 @@ export async function POST(req: NextRequest) {
 
     const text = await res.text();
 
-    // ── Store original video in Supabase Storage ──────────────────────────────
+    // ── Store original video in R2 ────────────────────────────────────────────
     let videoUrl = "";
     if (meetingId) {
       try {
-        const sb = getServerSupabase();
         const fileStats = await stat(videoPath);
-        if (sb && fileStats.size <= MAX_VIDEO_STORE_BYTES) {
+        if (fileStats.size <= MAX_VIDEO_STORE_BYTES) {
           const videoBuffer = await readFile(videoPath);
           const ext = originalExt.replace(/^\./, "");
-          const storagePath = `${meetingId}/video.${ext}`;
+          const key = `${meetingId}/video.${ext}`;
           const contentType = ext === "webm" ? "video/webm"
             : ext === "mov" ? "video/quicktime"
             : ext === "avi" ? "video/x-msvideo"
             : "video/mp4";
-          const { error } = await sb.storage
-            .from("recordings")
-            .upload(storagePath, videoBuffer, { contentType, upsert: true });
-          if (!error) {
-            const { data } = sb.storage.from("recordings").getPublicUrl(storagePath);
-            videoUrl = data.publicUrl;
-          }
+          videoUrl = (await uploadToR2(key, videoBuffer, contentType)) ?? "";
         }
       } catch { /* non-critical — transcription succeeded, video storage optional */ }
     }

@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { getServerSupabase } from "@/lib/supabase";
+import { uploadToR2 } from "@/lib/r2";
 
 export const maxDuration = 300;
 
-// Supabase Storage default max per file is 50 MB on the free tier.
-// Users can raise this in their Supabase dashboard → Storage → Settings.
-const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB ceiling on our end
+const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 
 export async function POST(req: NextRequest) {
-  const sb = getServerSupabase();
-  if (!sb) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
-
   const formData = await req.formData();
   const chunk = formData.get("chunk") as File | null;
   const uploadId = formData.get("uploadId") as string;
@@ -46,22 +41,18 @@ export async function POST(req: NextRequest) {
 
     const videoBuffer = await readFile(videoPath);
     const ext = fileExt.replace(/^\./, "");
-    const storagePath = `${meetingId}/video.${ext}`;
+    const key = `${meetingId}/video.${ext}`;
     const contentType = ext === "webm" ? "video/webm"
       : ext === "mov" ? "video/quicktime"
       : ext === "avi" ? "video/x-msvideo"
       : "video/mp4";
 
-    const { error } = await sb.storage
-      .from("recordings")
-      .upload(storagePath, videoBuffer, { contentType, upsert: true });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const url = await uploadToR2(key, videoBuffer, contentType);
+    if (!url) {
+      return NextResponse.json({ error: "R2 storage not configured or upload failed" }, { status: 500 });
     }
 
-    const { data } = sb.storage.from("recordings").getPublicUrl(storagePath);
-    return NextResponse.json({ url: data.publicUrl });
+    return NextResponse.json({ url });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed";
     return NextResponse.json({ error: msg }, { status: 500 });
