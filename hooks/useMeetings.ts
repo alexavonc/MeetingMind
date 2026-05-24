@@ -378,6 +378,21 @@ export function useMeetings() {
     });
   }, []);
 
+  const reassignUtterance = useCallback((meetingId: string, utteranceIdx: number, speakerKey: string) => {
+    setMeetings((prev) => {
+      const updated = prev.map((m) => {
+        if (m.id !== meetingId) return m;
+        const transcript = m.transcript.map((u, i) =>
+          i === utteranceIdx ? { ...u, s: speakerKey } : u
+        );
+        dbUpdate(meetingId, { transcript });
+        return { ...m, transcript };
+      });
+      saveDB(updated);
+      return updated;
+    });
+  }, []);
+
   const moveMeeting = useCallback((id: string, folder: Folder) => {
     setMeetings((prev) => {
       const updated = prev.map((m) => m.id === id ? { ...m, folder } : m);
@@ -852,6 +867,7 @@ export function useMeetings() {
     attachAudio,
     renameMeeting,
     renameSpeaker,
+    reassignUtterance,
     moveMeeting,
     deleteMeeting,
     generateShareLink,

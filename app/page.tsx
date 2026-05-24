@@ -119,6 +119,7 @@ export default function Home() {
     regeneratePointers,
     findReplaceInMeeting,
     renameSpeaker,
+    reassignUtterance,
     processNotes,
     processUpload,
   } = useMeetings();
@@ -379,6 +380,7 @@ export default function Home() {
                 <TranscriptView
                   meeting={selectedMeeting}
                   onRenameSpeaker={(key, name) => renameSpeaker(selectedMeeting.id, key, name)}
+                  onReassignUtterance={(idx, key) => reassignUtterance(selectedMeeting.id, idx, key)}
                 />
               ) : activeTab === "pointers" ? (
                 <PointersView meeting={selectedMeeting} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import ParsedText from "./ParsedText";
 import type { Meeting } from "@/types";
@@ -8,6 +8,7 @@ import type { Meeting } from "@/types";
 interface Props {
   meeting: Meeting;
   onRenameSpeaker?: (key: string, name: string) => void;
+  onReassignUtterance?: (utteranceIdx: number, speakerKey: string) => void;
 }
 
 const SPEAKER_COLORS = [
@@ -17,13 +18,18 @@ const SPEAKER_COLORS = [
   "text-orange-500",
 ];
 
+const SPEAKER_BG = [
+  "bg-blue-50 border-blue-200 hover:bg-blue-100",
+  "bg-emerald-50 border-emerald-200 hover:bg-emerald-100",
+  "bg-violet-50 border-violet-200 hover:bg-violet-100",
+  "bg-orange-50 border-orange-200 hover:bg-orange-100",
+];
+
 function SpeakerChip({
-  speakerKey,
   name,
   color,
   onRename,
 }: {
-  speakerKey: string;
   name: string;
   color: string;
   onRename?: (name: string) => void;
@@ -81,17 +87,62 @@ function SpeakerChip({
   );
 }
 
-export default function TranscriptView({ meeting, onRenameSpeaker }: Props) {
+function SpeakerPicker({
+  speakerKeys,
+  speakers,
+  currentKey,
+  onSelect,
+  onClose,
+}: {
+  speakerKeys: string[];
+  speakers: Record<string, string>;
+  currentKey: string;
+  onSelect: (key: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute left-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
+    >
+      {speakerKeys.map((key, i) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => { onSelect(key); onClose(); }}
+          className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors
+            ${key === currentKey ? "bg-secondary font-semibold" : "hover:bg-secondary/60"}`}
+        >
+          <span className={`inline-block w-2 h-2 rounded-full bg-current flex-shrink-0 ${SPEAKER_COLORS[i % SPEAKER_COLORS.length]}`} />
+          <span className={SPEAKER_COLORS[i % SPEAKER_COLORS.length]}>{speakers[key]}</span>
+          {key === currentKey && <span className="ml-auto text-muted-foreground">✓</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function TranscriptView({ meeting, onRenameSpeaker, onReassignUtterance }: Props) {
   const speakerKeys = Object.keys(meeting.speakers);
+  const [openPickerIdx, setOpenPickerIdx] = useState<number | null>(null);
 
   return (
     <div className="space-y-4">
-      {/* Speaker legend — click to rename */}
+      {/* Speaker legend — click name to rename */}
       <div className="flex flex-wrap gap-3 pb-3 border-b border-border">
         {speakerKeys.map((key, i) => (
           <SpeakerChip
             key={key}
-            speakerKey={key}
             name={meeting.speakers[key]}
             color={SPEAKER_COLORS[i % SPEAKER_COLORS.length]}
             onRename={onRenameSpeaker ? (name) => onRenameSpeaker(key, name) : undefined}
@@ -104,17 +155,39 @@ export default function TranscriptView({ meeting, onRenameSpeaker }: Props) {
         {meeting.transcript.map((utterance, idx) => {
           const speakerIdx = speakerKeys.indexOf(utterance.s);
           const colorClass = SPEAKER_COLORS[speakerIdx % SPEAKER_COLORS.length];
+          const bgClass = SPEAKER_BG[speakerIdx % SPEAKER_BG.length];
           const name = meeting.speakers[utterance.s] ?? utterance.s;
 
           return (
             <div key={idx} className="flex gap-2.5">
-              <div className="flex-shrink-0 flex flex-col items-end gap-0.5 pt-0.5 w-16 sm:w-24">
-                <span className={`text-xs font-semibold ${colorClass}`}>
-                  {name.split(" ")[0]}
-                </span>
+              {/* Speaker label — click to reassign */}
+              <div className="flex-shrink-0 flex flex-col items-end gap-0.5 pt-0.5 w-16 sm:w-24 relative">
+                {onReassignUtterance ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenPickerIdx(openPickerIdx === idx ? null : idx)}
+                    className={`text-xs font-semibold px-1.5 py-0.5 rounded border transition-colors ${colorClass} ${bgClass}`}
+                    title="Change speaker"
+                  >
+                    {name.split(" ")[0]}
+                  </button>
+                ) : (
+                  <span className={`text-xs font-semibold ${colorClass}`}>
+                    {name.split(" ")[0]}
+                  </span>
+                )}
                 <span className="text-xs text-muted-foreground font-mono">
                   {utterance.t}
                 </span>
+                {openPickerIdx === idx && onReassignUtterance && (
+                  <SpeakerPicker
+                    speakerKeys={speakerKeys}
+                    speakers={meeting.speakers}
+                    currentKey={utterance.s}
+                    onSelect={(key) => onReassignUtterance(idx, key)}
+                    onClose={() => setOpenPickerIdx(null)}
+                  />
+                )}
               </div>
               <div className="flex-1 text-sm leading-relaxed text-foreground/90">
                 <ParsedText text={utterance.text} />
