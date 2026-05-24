@@ -30,8 +30,8 @@ async function dbUpsert(meeting: Meeting, userId?: string) {
   if (error) {
     // Columns like frameurls/pointers/pointgroups may not exist yet — retry with core fields
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { frameurls, pointers, visualnotes, pointgroups, ...coreRow } = row as typeof row & {
-      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown; pointgroups?: unknown;
+    const { frameurls, pointers, visualnotes, pointgroups, videourl, ...coreRow } = row as typeof row & {
+      frameurls?: unknown; pointers?: unknown; visualnotes?: unknown; pointgroups?: unknown; videourl?: unknown;
     };
     await sb.from("meetings").upsert(coreRow);
   }
@@ -614,6 +614,7 @@ export function useMeetings() {
         let raw: string;
         let visualContext = ""; // hoisted so newMeeting can reference it
         let savedFrameUrls: { url: string; timestamp: number }[] | undefined;
+        let savedVideoUrl: string | undefined;
         if (typeof input === "string") {
           raw = input;
           setProcessing({ active: true, step: "diarising", error: null });
@@ -652,9 +653,11 @@ export function useMeetings() {
                 form.append("chunkIndex", String(i));
                 form.append("totalChunks", String(totalChunks));
                 if (i === totalChunks - 1) {
-                  // Processing happens on final chunk — pass keys
+                  // Processing happens on final chunk — pass keys + meetingId for storage
                   form.append("whisperKey", settings.whisperKey);
                   form.append("provider", settings.transcriptionProvider);
+                  form.append("meetingId", meetingId);
+                  form.append("fileExt", f.name.split(".").pop() ?? "mp4");
                   setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio + transcribing…" });
                 }
                 const res = await fetch("/api/video-upload", { method: "POST", body: form });
@@ -663,7 +666,8 @@ export function useMeetings() {
                   throw new Error(error || "Video upload failed");
                 }
                 if (i === totalChunks - 1) {
-                  const { text } = await res.json() as { text: string };
+                  const { text, videoUrl } = await res.json() as { text: string; videoUrl?: string };
+                  if (videoUrl) savedVideoUrl = videoUrl;
                   transcriptParts.push(text);
                 }
               }
@@ -782,6 +786,7 @@ export function useMeetings() {
           flow,
           ...(visualContext ? { visualnotes: visualContext.trim() } : {}),
           ...(savedFrameUrls ? { frameurls: savedFrameUrls } : {}),
+          ...(savedVideoUrl ? { videourl: savedVideoUrl } : {}),
           // pointers added via background update below
         };
 

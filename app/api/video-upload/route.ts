@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { appendFile, mkdir, readFile, rm } from "fs/promises";
+import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, extname } from "path";
+import { getServerSupabase } from "@/lib/supabase";
 
 const execAsync = promisify(exec);
 export const maxDuration = 300;
@@ -11,6 +12,9 @@ export const maxDuration = 300;
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const OPENAI_URL = "https://api.openai.com/v1/audio/transcriptions";
 const SG_PROMPT = "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.";
+
+// Max video file size to store in Supabase (500 MB) — skip silently if larger
+const MAX_VIDEO_STORE_BYTES = 500 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -29,7 +33,6 @@ export async function POST(req: NextRequest) {
   const isLast = chunkIndex === totalChunks - 1;
 
   try {
-    // Append this chunk directly to the assembling video file (sequential uploads only)
     await mkdir(dir, { recursive: true });
     const buf = await chunk.arrayBuffer();
     await appendFile(videoPath, Buffer.from(buf));
@@ -41,10 +44,11 @@ export async function POST(req: NextRequest) {
     // ── Final chunk: extract audio + transcribe ───────────────────────────────
     const whisperKey = formData.get("whisperKey") as string;
     const provider = (formData.get("provider") as string) || "groq";
+    const meetingId = formData.get("meetingId") as string | null;
+    const originalExt = (formData.get("fileExt") as string | null) ?? "mp4";
 
     if (!whisperKey) return NextResponse.json({ error: "Missing API key" }, { status: 400 });
 
-    // Extract audio: 32kbps mono mp3 — 40 min ≈ 10 MB, well under Groq's 25 MB limit
     await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 32k "${audioPath}"`);
 
     const audioBuffer = await readFile(audioPath);
@@ -70,7 +74,33 @@ export async function POST(req: NextRequest) {
     }
 
     const text = await res.text();
-    return NextResponse.json({ text });
+
+    // ── Store original video in Supabase Storage ──────────────────────────────
+    let videoUrl = "";
+    if (meetingId) {
+      try {
+        const sb = getServerSupabase();
+        const fileStats = await stat(videoPath);
+        if (sb && fileStats.size <= MAX_VIDEO_STORE_BYTES) {
+          const videoBuffer = await readFile(videoPath);
+          const ext = originalExt.replace(/^\./, "");
+          const storagePath = `${meetingId}/video.${ext}`;
+          const contentType = ext === "webm" ? "video/webm"
+            : ext === "mov" ? "video/quicktime"
+            : ext === "avi" ? "video/x-msvideo"
+            : "video/mp4";
+          const { error } = await sb.storage
+            .from("recordings")
+            .upload(storagePath, videoBuffer, { contentType, upsert: true });
+          if (!error) {
+            const { data } = sb.storage.from("recordings").getPublicUrl(storagePath);
+            videoUrl = data.publicUrl;
+          }
+        }
+      } catch { /* non-critical — transcription succeeded, video storage optional */ }
+    }
+
+    return NextResponse.json({ text, videoUrl });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });

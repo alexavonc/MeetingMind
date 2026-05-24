@@ -15,6 +15,7 @@ import SettingsModal from "./components/SettingsModal";
 import RecordModal from "./components/RecordModal";
 import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
+import VideoPlayer from "./components/VideoPlayer";
 import PointersView from "./components/PointersView";
 import FindReplaceBar from "./components/FindReplaceBar";
 import ProcessingSteps from "./components/ProcessingSteps";
@@ -130,6 +131,7 @@ export default function Home() {
   const [recordOpen, setRecordOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [videoPlayerOpen, setVideoPlayerOpen] = useState(true);
 
   // Cmd+F / Ctrl+F opens find-replace when a meeting is selected
   useEffect(() => {
@@ -162,6 +164,7 @@ export default function Home() {
     setActiveTab("transcript");
     setSidebarOpen(false);
     setFindReplaceOpen(false);
+    setVideoPlayerOpen(true);
   }
 
   async function handleProcessUpload(
@@ -332,13 +335,15 @@ export default function Home() {
 
         {selectedMeeting ? (
           <>
-            {/* Audio bar */}
-            <AudioBar
-              audioUrl={selectedMeeting.audiourl}
-              onAttach={(file) => attachAudio(selectedMeeting.id, file)}
-              onReplace={(file) => reprocessMeeting(selectedMeeting.id, file)}
-              onReprocess={() => reprocessMeeting(selectedMeeting.id)}
-            />
+            {/* Audio bar — hidden when video is available (video player handles audio) */}
+            {!selectedMeeting.videourl && (
+              <AudioBar
+                audioUrl={selectedMeeting.audiourl}
+                onAttach={(file) => attachAudio(selectedMeeting.id, file)}
+                onReplace={(file) => reprocessMeeting(selectedMeeting.id, file)}
+                onReprocess={() => reprocessMeeting(selectedMeeting.id)}
+              />
+            )}
 
             {/* Tab bar */}
             <div className="flex border-b border-border flex-shrink-0">
@@ -477,6 +482,15 @@ export default function Home() {
           meeting={selectedMeeting}
           provider={settings.transcriptionProvider ?? "groq"}
           onClose={() => setCostOpen(false)}
+        />
+      )}
+
+      {/* Floating video player — shown when the selected meeting has a stored video */}
+      {selectedMeeting?.videourl && videoPlayerOpen && (
+        <VideoPlayer
+          url={selectedMeeting.videourl}
+          title={selectedMeeting.title}
+          onClose={() => setVideoPlayerOpen(false)}
         />
       )}
     </div>
