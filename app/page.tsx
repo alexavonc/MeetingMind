@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings, List } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings, List, Replace } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "./components/Sidebar";
@@ -16,6 +16,7 @@ import RecordModal from "./components/RecordModal";
 import ExportDropdown from "./components/ExportDropdown";
 import AudioPlayer from "./components/AudioPlayer";
 import PointersView from "./components/PointersView";
+import FindReplaceBar from "./components/FindReplaceBar";
 import ProcessingSteps from "./components/ProcessingSteps";
 import CostModal from "./components/CostModal";
 import { estimateMeetingCost, formatUSD } from "@/lib/costs";
@@ -116,6 +117,7 @@ export default function Home() {
     generateShareLink,
     regenerateFlow,
     regeneratePointers,
+    findReplaceInMeeting,
     processNotes,
     processUpload,
   } = useMeetings();
@@ -125,6 +127,19 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+
+  // Cmd+F / Ctrl+F opens find-replace when a meeting is selected
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f" && selectedMeeting) {
+        e.preventDefault();
+        setFindReplaceOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedMeeting]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -144,6 +159,7 @@ export default function Home() {
     setSelectedId(id);
     setActiveTab("transcript");
     setSidebarOpen(false);
+    setFindReplaceOpen(false);
   }
 
   async function handleProcessUpload(
@@ -271,10 +287,25 @@ export default function Home() {
           {/* Desktop actions */}
           <div className="hidden md:flex items-center gap-2">
             {selectedMeeting && (
-              <ExportDropdown
-                meeting={selectedMeeting}
-                onShare={() => generateShareLink(selectedMeeting.id)}
-              />
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFindReplaceOpen((v) => !v)}
+                  title="Find & Replace (⌘F)"
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                    findReplaceOpen
+                      ? "bg-primary/10 text-primary border-primary/30"
+                      : "text-muted-foreground border-border hover:text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  <Replace className="w-4 h-4" />
+                  <span className="hidden lg:inline text-xs">Find &amp; Replace</span>
+                </button>
+                <ExportDropdown
+                  meeting={selectedMeeting}
+                  onShare={() => generateShareLink(selectedMeeting.id)}
+                />
+              </>
             )}
             <button
               type="button"
@@ -325,6 +356,17 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            {/* Find & Replace bar */}
+            {findReplaceOpen && (
+              <FindReplaceBar
+                meeting={selectedMeeting}
+                onReplace={(find, replace, caseSensitive) =>
+                  findReplaceInMeeting(selectedMeeting.id, find, replace, caseSensitive)
+                }
+                onClose={() => setFindReplaceOpen(false)}
+              />
+            )}
 
             {/* Tab content — replaced by progress UI while reprocessing */}
             <div className="flex-1 overflow-y-auto px-4 py-5 pb-28 md:pb-5">

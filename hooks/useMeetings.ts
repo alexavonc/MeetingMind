@@ -7,6 +7,7 @@ import { getSupabase } from "@/lib/supabase";
 import { SEED_MEETINGS } from "@/lib/seeds";
 import { diarise, summarise, genFlow, genPointers, notesToMeeting, analyzeVisuals } from "@/lib/claude";
 import { transcribeAudio } from "@/lib/whisper";
+import { applyFindReplace } from "@/lib/findReplace";
 
 // ── Supabase helpers ─────────────────────────────────────────────────────────
 
@@ -437,6 +438,32 @@ export function useMeetings() {
     await dbUpdate(meetingId, patch);
   }, [meetings, settings.claudeKey]);
 
+  const findReplaceInMeeting = useCallback(async (
+    meetingId: string,
+    find: string,
+    replace: string,
+    caseSensitive: boolean
+  ) => {
+    const meeting = meetings.find((m) => m.id === meetingId);
+    if (!meeting) return;
+    const updated = applyFindReplace(meeting, find, replace, caseSensitive);
+    setMeetings((prev) => {
+      const newList = prev.map((m) => m.id === meetingId ? updated : m);
+      saveDB(newList);
+      return newList;
+    });
+    await dbUpdate(meetingId, {
+      title: updated.title,
+      summary: updated.summary,
+      transcript: updated.transcript,
+      actions: updated.actions,
+      speakers: updated.speakers,
+      ...(updated.pointers !== undefined ? { pointers: updated.pointers } : {}),
+      ...(updated.pointgroups !== undefined ? { pointgroups: updated.pointgroups } : {}),
+      ...(updated.visualnotes !== undefined ? { visualnotes: updated.visualnotes } : {}),
+    });
+  }, [meetings]);
+
   const renameFolder = useCallback((oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
@@ -814,6 +841,7 @@ export function useMeetings() {
     generateShareLink,
     regenerateFlow,
     regeneratePointers,
+    findReplaceInMeeting,
     processNotes,
     processUpload,
   };
