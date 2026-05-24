@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, useRef } from "react";
+import { Pencil } from "lucide-react";
 import ParsedText from "./ParsedText";
 import type { Meeting } from "@/types";
 
 interface Props {
   meeting: Meeting;
+  onRenameSpeaker?: (key: string, name: string) => void;
 }
 
 const SPEAKER_COLORS = [
@@ -14,22 +17,85 @@ const SPEAKER_COLORS = [
   "text-orange-500",
 ];
 
-export default function TranscriptView({ meeting }: Props) {
+function SpeakerChip({
+  speakerKey,
+  name,
+  color,
+  onRename,
+}: {
+  speakerKey: string;
+  name: string;
+  color: string;
+  onRename?: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    if (!onRename) return;
+    setValue(name);
+    setEditing(true);
+    setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0);
+  }
+
+  function commit() {
+    setEditing(false);
+    if (value.trim() && value.trim() !== name) onRename?.(value.trim());
+    else setValue(name);
+  }
+
+  if (editing) {
+    return (
+      <span className="flex items-center gap-1.5 text-sm">
+        <span className={`inline-block w-2 h-2 rounded-full bg-current flex-shrink-0 ${color}`} />
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") { setEditing(false); setValue(name); }
+          }}
+          className={`font-medium bg-transparent border-b border-current outline-none w-28 ${color}`}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      disabled={!onRename}
+      className={`flex items-center gap-1.5 text-sm group ${onRename ? "cursor-pointer" : "cursor-default"}`}
+      title={onRename ? `Rename ${name}` : undefined}
+    >
+      <span className={`inline-block w-2 h-2 rounded-full bg-current flex-shrink-0 ${color}`} />
+      <span className={`font-medium ${color}`}>{name}</span>
+      {onRename && (
+        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+      )}
+    </button>
+  );
+}
+
+export default function TranscriptView({ meeting, onRenameSpeaker }: Props) {
   const speakerKeys = Object.keys(meeting.speakers);
 
   return (
     <div className="space-y-4">
-      {/* Speaker legend */}
+      {/* Speaker legend — click to rename */}
       <div className="flex flex-wrap gap-3 pb-3 border-b border-border">
         {speakerKeys.map((key, i) => (
-          <span key={key} className="flex items-center gap-1.5 text-sm">
-            <span
-              className={`inline-block w-2 h-2 rounded-full bg-current ${SPEAKER_COLORS[i % SPEAKER_COLORS.length]}`}
-            />
-            <span className={`font-medium ${SPEAKER_COLORS[i % SPEAKER_COLORS.length]}`}>
-              {meeting.speakers[key]}
-            </span>
-          </span>
+          <SpeakerChip
+            key={key}
+            speakerKey={key}
+            name={meeting.speakers[key]}
+            color={SPEAKER_COLORS[i % SPEAKER_COLORS.length]}
+            onRename={onRenameSpeaker ? (name) => onRenameSpeaker(key, name) : undefined}
+          />
         ))}
       </div>
 

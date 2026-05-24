@@ -363,6 +363,21 @@ export function useMeetings() {
     dbUpdate(id, { title: title.trim() });
   }, []);
 
+  const renameSpeaker = useCallback((meetingId: string, speakerKey: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setMeetings((prev) => {
+      const updated = prev.map((m) => {
+        if (m.id !== meetingId) return m;
+        const speakers = { ...m.speakers, [speakerKey]: trimmed };
+        dbUpdate(meetingId, { speakers });
+        return { ...m, speakers };
+      });
+      saveDB(updated);
+      return updated;
+    });
+  }, []);
+
   const moveMeeting = useCallback((id: string, folder: Folder) => {
     setMeetings((prev) => {
       const updated = prev.map((m) => m.id === id ? { ...m, folder } : m);
@@ -836,6 +851,7 @@ export function useMeetings() {
     reprocessMeeting,
     attachAudio,
     renameMeeting,
+    renameSpeaker,
     moveMeeting,
     deleteMeeting,
     generateShareLink,

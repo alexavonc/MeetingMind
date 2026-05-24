@@ -118,6 +118,7 @@ export default function Home() {
     regenerateFlow,
     regeneratePointers,
     findReplaceInMeeting,
+    renameSpeaker,
     processNotes,
     processUpload,
   } = useMeetings();
@@ -375,7 +376,10 @@ export default function Home() {
                   <ProcessingSteps currentStep={processing.step} error={processing.error} detail={processing.detail} />
                 </div>
               ) : activeTab === "transcript" ? (
-                <TranscriptView meeting={selectedMeeting} />
+                <TranscriptView
+                  meeting={selectedMeeting}
+                  onRenameSpeaker={(key, name) => renameSpeaker(selectedMeeting.id, key, name)}
+                />
               ) : activeTab === "pointers" ? (
                 <PointersView meeting={selectedMeeting} />
               ) : activeTab === "summary" ? (
