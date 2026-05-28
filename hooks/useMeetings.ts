@@ -674,24 +674,26 @@ export function useMeetings() {
           const rawFiles = Array.isArray(input) ? input : [input];
           const isVideoFile = (f: File) =>
             f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
+          const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+          // On mobile, route all files through server-side FFmpeg to avoid
+          // client-side arrayBuffer()/AudioContext which crashes Safari on large files
+          const needsServerSide = (f: File) => isVideoFile(f) || isMobile;
 
-          // ── Video files: chunked upload → server-side FFmpeg + Whisper ─────────
-          // Chunks are plain binary slices (File.slice) — no in-browser decoding.
-          // Server appends each chunk, runs FFmpeg on the last one, returns transcript.
+          // ── Video files (or any file on mobile): chunked upload → server-side FFmpeg + Whisper ─────────
           const audioFiles: File[] = [];
           const GROQ_LIMIT = 25 * 1024 * 1024;
           const transcriptParts: string[] = [];
           const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 
           for (const f of rawFiles) {
-            if (isVideoFile(f)) {
+            if (needsServerSide(f)) {
               const uploadId = crypto.randomUUID();
               const totalChunks = Math.ceil(f.size / CHUNK_SIZE);
 
               for (let i = 0; i < totalChunks; i++) {
                 setProcessing({
                   active: true, step: "transcribing", error: null,
-                  detail: `Uploading video… chunk ${i + 1} of ${totalChunks}`,
+                  detail: `Uploading… chunk ${i + 1} of ${totalChunks}`,
                 });
                 const chunk = f.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
                 const form = new FormData();
@@ -721,7 +723,6 @@ export function useMeetings() {
 
               // Keyframe analysis for visual context (non-critical)
               // Skip on mobile — canvas seek loop crashes Safari on large files
-              const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
               try {
                 if (isMobile) throw new Error("skip");
                 setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
