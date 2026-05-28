@@ -85,6 +85,13 @@ body {
   fill: hsl(var(--muted-foreground));
 }
 
+/* Prevent iOS Safari from zooming in on focused inputs (requires font-size >= 16px) */
+@media screen and (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

@@ -720,7 +720,10 @@ export function useMeetings() {
               }
 
               // Keyframe analysis for visual context (non-critical)
+              // Skip on mobile — canvas seek loop crashes Safari on large files
+              const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
               try {
+                if (isMobile) throw new Error("skip");
                 setProcessing({ active: true, step: "transcribing", error: null, detail: "Scanning video frames…" });
                 const { extractKeyframes } = await import("@/lib/extractVideoFrames");
                 const frames = await extractKeyframes(f, (detail) =>
