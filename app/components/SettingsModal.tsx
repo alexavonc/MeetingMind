@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Eye, EyeOff, Copy, Check, LogOut, Send } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type { Settings, TranscriptionProvider } from "@/types";
@@ -26,6 +26,18 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
   const [showWhisper, setShowWhisper] = useState(false);
   const [showHf, setShowHf] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Re-sync local state from props each time the modal opens
+  useEffect(() => {
+    if (open) {
+      setClaudeKey(settings.claudeKey);
+      setWhisperKey(settings.whisperKey);
+      setProvider(settings.transcriptionProvider ?? "groq");
+      setIngestSecret(settings.ingestSecret ?? "");
+      setHfToken(settings.hfToken ?? "");
+      setHfEndpointUrl(settings.hfEndpointUrl ?? "");
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
@@ -75,8 +87,8 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
         </div>
 
         <div className="px-6 py-5 space-y-6">
-          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-            API keys are stored locally in your browser. Never share this device&apos;s localStorage with others.
+          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+            Keys are saved to your account and sync across all your devices automatically.
           </div>
 
           {/* Claude */}

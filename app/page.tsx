@@ -159,6 +159,7 @@ export default function Home() {
     renameFolder,
     deleteFolder,
     settings,
+    settingsReady,
     updateSettings,
     processing,
     toggleAction,
@@ -203,8 +204,15 @@ export default function Home() {
     if (!authLoading && !user) router.replace("/login");
   }, [user, authLoading, router]);
 
-  // Auth loading / not signed in — show spinner (redirect handled above)
-  if (authLoading || !user) {
+  // Once settings have loaded from Supabase, open settings modal if keys are still missing
+  useEffect(() => {
+    if (settingsReady && user && !settings.claudeKey) {
+      setSettingsOpen(true);
+    }
+  }, [settingsReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auth loading / settings loading / not signed in — show spinner
+  if (authLoading || !user || !settingsReady) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />

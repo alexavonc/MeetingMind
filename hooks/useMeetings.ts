@@ -84,6 +84,8 @@ export function useMeetings() {
     claudeKey: "", whisperKey: "", transcriptionProvider: "groq",
     ingestSecret: "", hfToken: "", hfEndpointUrl: "", folders: ["personal"],
   });
+  // true once Supabase settings fetch has resolved (or user is not signed in)
+  const [settingsReady, setSettingsReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<Folder>("personal");
   const [processing, setProcessing] = useState<ProcessingState>({
@@ -203,28 +205,34 @@ export function useMeetings() {
 
   // Load API keys from Supabase when user signs in (overrides localStorage for keys only)
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setSettingsReady(true); // no user → local settings are the source of truth
+      return;
+    }
     const sb = getSupabase();
-    if (!sb) return;
+    if (!sb) { setSettingsReady(true); return; }
     sb.from("user_settings")
       .select("groq_api_key,anthropic_api_key,transcription_provider,hf_token,hf_endpoint_url")
       .eq("user_id", userId)
       .single()
       .then(({ data }) => {
-        if (!data) return;
-        setSettings((prev) => {
-          const updated: Settings = {
-            ...prev,
-            ...(data.groq_api_key ? { whisperKey: data.groq_api_key } : {}),
-            ...(data.anthropic_api_key ? { claudeKey: data.anthropic_api_key } : {}),
-            ...(data.transcription_provider ? { transcriptionProvider: data.transcription_provider } : {}),
-            ...(data.hf_token ? { hfToken: data.hf_token } : {}),
-            ...(data.hf_endpoint_url ? { hfEndpointUrl: data.hf_endpoint_url } : {}),
-          };
-          saveSettings(updated);
-          return updated;
-        });
-      });
+        if (data) {
+          setSettings((prev) => {
+            const updated: Settings = {
+              ...prev,
+              ...(data.groq_api_key ? { whisperKey: data.groq_api_key } : {}),
+              ...(data.anthropic_api_key ? { claudeKey: data.anthropic_api_key } : {}),
+              ...(data.transcription_provider ? { transcriptionProvider: data.transcription_provider } : {}),
+              ...(data.hf_token ? { hfToken: data.hf_token } : {}),
+              ...(data.hf_endpoint_url ? { hfEndpointUrl: data.hf_endpoint_url } : {}),
+            };
+            saveSettings(updated);
+            return updated;
+          });
+        }
+        setSettingsReady(true); // done — whether or not data existed
+      })
+      .catch(() => setSettingsReady(true)); // table missing / RLS error → still unblock
   }, [userId]);
 
   const updateSettings = useCallback((s: Settings) => {
@@ -902,6 +910,7 @@ export function useMeetings() {
     renameFolder,
     deleteFolder,
     settings,
+    settingsReady,
     updateSettings,
     processing,
     toggleAction,
