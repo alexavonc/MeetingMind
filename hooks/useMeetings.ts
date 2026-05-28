@@ -205,17 +205,15 @@ export function useMeetings() {
 
   // Load API keys from Supabase when user signs in (overrides localStorage for keys only)
   useEffect(() => {
-    if (!userId) {
-      setSettingsReady(true); // no user → local settings are the source of truth
-      return;
-    }
+    if (!userId) { setSettingsReady(true); return; }
     const sb = getSupabase();
     if (!sb) { setSettingsReady(true); return; }
-    sb.from("user_settings")
-      .select("groq_api_key,anthropic_api_key,transcription_provider,hf_token,hf_endpoint_url")
-      .eq("user_id", userId)
-      .single()
-      .then(({ data }) => {
+    async function load() {
+      try {
+        const { data } = await sb!.from("user_settings")
+          .select("groq_api_key,anthropic_api_key,transcription_provider,hf_token,hf_endpoint_url")
+          .eq("user_id", userId)
+          .single();
         if (data) {
           setSettings((prev) => {
             const updated: Settings = {
@@ -230,9 +228,10 @@ export function useMeetings() {
             return updated;
           });
         }
-        setSettingsReady(true); // done — whether or not data existed
-      })
-      .catch(() => setSettingsReady(true)); // table missing / RLS error → still unblock
+      } catch { /* table missing / RLS error — still unblock */ }
+      setSettingsReady(true);
+    }
+    void load();
   }, [userId]);
 
   const updateSettings = useCallback(async (s: Settings): Promise<{ synced: boolean; error?: string }> => {
