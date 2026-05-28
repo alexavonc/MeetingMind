@@ -235,13 +235,13 @@ export function useMeetings() {
       .catch(() => setSettingsReady(true)); // table missing / RLS error → still unblock
   }, [userId]);
 
-  const updateSettings = useCallback((s: Settings) => {
+  const updateSettings = useCallback(async (s: Settings): Promise<{ synced: boolean; error?: string }> => {
     setSettings(s);
     saveSettings(s);
-    // Sync API keys to Supabase so they sync across devices and the Telegram bot can use them
     if (userId) {
       const sb = getSupabase();
-      void sb?.from("user_settings").upsert({
+      if (!sb) return { synced: false, error: "Supabase not configured" };
+      const { error } = await sb.from("user_settings").upsert({
         user_id: userId,
         groq_api_key: s.whisperKey || null,
         anthropic_api_key: s.claudeKey || null,
@@ -249,7 +249,10 @@ export function useMeetings() {
         hf_token: s.hfToken || null,
         hf_endpoint_url: s.hfEndpointUrl || null,
       });
+      if (error) return { synced: false, error: error.message };
+      return { synced: true };
     }
+    return { synced: false, error: "Not signed in" };
   }, [userId]);
 
   const toggleAction = useCallback((meetingId: string, actionIndex: number) => {

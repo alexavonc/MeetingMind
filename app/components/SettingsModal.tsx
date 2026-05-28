@@ -11,7 +11,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   settings: Settings;
-  onSave: (s: Settings) => void;
+  onSave: (s: Settings) => Promise<{ synced: boolean; error?: string }>;
   user?: User | null;
 }
 
@@ -26,6 +26,8 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
   const [showWhisper, setShowWhisper] = useState(false);
   const [showHf, setShowHf] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Re-sync local state from props each time the modal opens
   useEffect(() => {
@@ -36,13 +38,17 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
       setIngestSecret(settings.ingestSecret ?? "");
       setHfToken(settings.hfToken ?? "");
       setHfEndpointUrl(settings.hfEndpointUrl ?? "");
+      setSaveState("idle");
+      setSaveError(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
-  function handleSave() {
-    onSave({
+  async function handleSave() {
+    setSaveState("saving");
+    setSaveError(null);
+    const result = await onSave({
       claudeKey: claudeKey.trim(),
       whisperKey: whisperKey.trim(),
       transcriptionProvider: provider,
@@ -51,7 +57,13 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
       hfEndpointUrl: hfEndpointUrl.trim(),
       folders: settings.folders ?? ["personal"],
     });
-    onClose();
+    if (result.synced) {
+      setSaveState("saved");
+      setTimeout(onClose, 1200);
+    } else {
+      setSaveState("error");
+      setSaveError(result.error ?? "Unknown error");
+    }
   }
 
   function generateSecret() {
@@ -244,13 +256,31 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
           </div>
         </div>
 
-        <div className="px-6 pb-5 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Cancel
-          </button>
-          <button type="button" onClick={handleSave} className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-            Save
-          </button>
+        <div className="px-6 pb-5 space-y-3">
+          {saveState === "error" && saveError && (
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300">
+              <strong>Sync failed:</strong> {saveError}
+              <div className="mt-1 opacity-80">Keys saved locally — run the Supabase SQL migration to enable cross-device sync.</div>
+            </div>
+          )}
+          {saveState === "saved" && (
+            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-xs text-green-700 dark:text-green-300">
+              Saved and synced to your account ✓
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saveState === "saving" || saveState === "saved"}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors min-w-[80px]"
+            >
+              {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
