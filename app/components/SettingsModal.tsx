@@ -99,10 +99,6 @@ export default function SettingsModal({ open, onClose, settings, onSave, user }:
         </div>
 
         <div className="px-6 py-5 space-y-6">
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
-            Keys are saved to your account and sync across all your devices automatically.
-          </div>
-
           {/* Claude */}
           <KeyInput
             label="Anthropic Claude API Key"
