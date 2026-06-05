@@ -88,7 +88,7 @@ export default function PointersView({ meeting, onRecoverFrames }: Props) {
   return (
     <div>
       {/* Recovery banner — shown when frames are missing but may exist in Storage */}
-      {!hasFrames && meeting.videourl && onRecoverFrames && recoverResult !== "none" && (
+      {!hasFrames && onRecoverFrames && recoverResult !== "none" && (
         <div className="mb-4 flex items-center gap-3 p-3 rounded-lg bg-secondary/60 border border-border text-sm">
           <span className="text-muted-foreground flex-1">
             {recoverResult === "found"
