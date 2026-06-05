@@ -1,220 +1,26 @@
 "use client";
 
-import { useMemo, useEffect, useState, type ReactNode } from "react";
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  BackgroundVariant,
-  Handle,
-  Position,
-  useNodesState,
-  useEdgesState,
-  type Node,
-  type Edge,
-  type NodeTypes,
-} from "@xyflow/react";
-import Dagre from "@dagrejs/dagre";
-import "@xyflow/react/dist/style.css";
+import { useState, useEffect, type ReactNode } from "react";
+import { FileAudio, List, AlignLeft, GitBranch } from "lucide-react";
 import type { Meeting } from "@/types";
-import ParsedText from "@/app/components/ParsedText";
-import MarkdownSummary from "@/app/components/MarkdownSummary";
+import TranscriptView from "@/app/components/TranscriptView";
+import PointersView from "@/app/components/PointersView";
+import SummaryView from "@/app/components/SummaryView";
+import FlowchartView from "@/app/components/FlowchartView";
 import { getSupabase } from "@/lib/supabase";
 
-// ── Flowchart helpers (same as FlowchartView) ─────────────────────────────────
+type Tab = "transcript" | "pointers" | "summary" | "flowchart";
 
-interface RawNode { id: string; label: string; type?: string }
-interface RawEdge { source: string; target: string; label?: string; id?: string }
-interface FlowData { nodes: RawNode[]; edges: RawEdge[] }
+const TABS: { value: Tab; label: string; icon: ReactNode }[] = [
+  { value: "transcript", label: "Transcript", icon: <FileAudio className="w-4 h-4" /> },
+  { value: "pointers",   label: "Pointers",   icon: <List className="w-4 h-4" /> },
+  { value: "summary",    label: "Summary",    icon: <AlignLeft className="w-4 h-4" /> },
+  { value: "flowchart",  label: "Flowchart",  icon: <GitBranch className="w-4 h-4" /> },
+];
 
-function parseFlow(flow: string): FlowData | null {
-  try {
-    const data = JSON.parse(flow) as FlowData;
-    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function buildLayoutedElements(raw: FlowData): { nodes: Node[]; edges: Edge[] } {
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", ranksep: 60, nodesep: 50 });
-  raw.nodes.forEach((n) => g.setNode(n.id, { width: 170, height: 48 }));
-  raw.edges.forEach((e) => g.setEdge(e.source, e.target));
-  Dagre.layout(g);
-
-  const nodes: Node[] = raw.nodes.map((n) => {
-    const pos = g.node(n.id);
-    return {
-      id: n.id,
-      type: "flowNode",
-      position: { x: pos.x - 85, y: pos.y - 24 },
-      data: { label: n.label, nodeType: n.type ?? "step" },
-    };
-  });
-  const edges: Edge[] = raw.edges.map((e, i) => ({
-    id: e.id ?? `e-${i}`,
-    source: e.source,
-    target: e.target,
-    label: e.label,
-    type: "smoothstep",
-    style: { stroke: "hsl(258 89% 62% / 0.55)", strokeWidth: 1.5 },
-    labelStyle: { fontSize: 10, fill: "#888" },
-    labelBgStyle: { fill: "white", fillOpacity: 0.8 },
-  }));
-  return { nodes, edges };
-}
-
-function FlowNode({ data }: { data: { label: string; nodeType?: string } }) {
-  const { nodeType = "step" } = data;
-  const cls =
-    nodeType === "start" ? "bg-violet-100 border-violet-300 text-violet-700"
-    : nodeType === "end" ? "bg-emerald-100 border-emerald-300 text-emerald-700"
-    : nodeType === "decision" ? "bg-amber-100 border-amber-300 text-amber-700"
-    : "bg-white border-gray-200 text-gray-700";
-  return (
-    <div className={`px-3 py-2.5 rounded-lg border text-[11px] font-medium text-center w-[170px] leading-snug shadow-sm ${cls}`}>
-      <Handle type="target" position={Position.Top} style={{ background: "#d1d5db", width: 6, height: 6, border: "none" }} />
-      {data.label}
-      <Handle type="source" position={Position.Bottom} style={{ background: "#d1d5db", width: 6, height: 6, border: "none" }} />
-    </div>
-  );
-}
-
-const NODE_TYPES: NodeTypes = { flowNode: FlowNode };
-
-function FlowChart({ flow }: { flow: string }) {
-  const flowData = useMemo(() => parseFlow(flow), [flow]);
-  const { nodes: initNodes, edges: initEdges } = useMemo(
-    () => (flowData ? buildLayoutedElements(flowData) : { nodes: [], edges: [] }),
-    [flowData]
-  );
-  const [nodes, , onNodesChange] = useNodesState(initNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initEdges);
-
-  if (!flowData || nodes.length === 0) return null;
-
-  return (
-    <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: 460 }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={NODE_TYPES}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnDrag
-        zoomOnScroll
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e5e7eb" />
-        <Controls showInteractive={false} />
-      </ReactFlow>
-    </div>
-  );
-}
-
-// ── Pointers section ──────────────────────────────────────────────────────────
-
-function parseBullet(line: string) {
-  const text = line.replace(/^[•\-*]\s*/, "").trim();
-  const m = text.match(/^\[(\d+:\d+(?::\d+)?)\]\s+(.+?)\s+[—\-]{1,2}\s+(.+)$/);
-  if (m) return { time: m[1], speaker: m[2], point: m[3] };
-  return { time: null, speaker: null, point: text };
-}
-
-function toSeconds(ts: string): number {
-  const parts = ts.split(":").map(Number);
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  return parts[0] * 60 + (parts[1] ?? 0);
-}
-
-function fmtSeconds(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
-}
-
-function PointersSection({ meeting }: { meeting: Meeting }) {
-  if (!meeting.pointers) return null;
-
-  const lines = meeting.pointers
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => /^[•\-*]/.test(l) || /^\[\d+:\d+\]/.test(l));
-
-  if (lines.length === 0) return null;
-
-  const frames = [...(meeting.frameurls ?? [])].sort((a, b) => a.timestamp - b.timestamp);
-  const hasFrames = frames.length > 0;
-  let lastShownUrl: string | null = null;
-
-  return (
-    <section>
-      <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-        <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
-        Key Points
-      </h2>
-      <div>
-        {lines.map((line, i) => {
-          const { time, speaker, point } = parseBullet(line);
-          let screenshotEl: ReactNode = null;
-
-          if (hasFrames && time) {
-            const secs = toSeconds(time);
-            let frame: { url: string; timestamp: number } | null = null;
-            for (const f of frames) {
-              if (f.timestamp <= secs) frame = f;
-              else break;
-            }
-            if (frame && frame.url !== lastShownUrl) {
-              lastShownUrl = frame.url;
-              screenshotEl = (
-                <div className="pt-4 pb-1">
-                  <a href={frame.url} target="_blank" rel="noopener noreferrer" className="block">
-                    <img
-                      src={frame.url}
-                      alt={`Screen at ${fmtSeconds(frame.timestamp)}`}
-                      className="rounded-xl border border-gray-200 w-full max-w-sm object-cover"
-                    />
-                  </a>
-                  <span className="text-[11px] font-mono text-gray-400 mt-1 block">
-                    {fmtSeconds(frame.timestamp)}
-                  </span>
-                </div>
-              );
-            }
-          }
-
-          return (
-            <div key={i}>
-              {screenshotEl}
-              <div className="flex gap-3 py-2 px-1 rounded-lg">
-                {time ? (
-                  <span className="flex-shrink-0 font-mono text-[11px] text-violet-500 mt-0.5 w-10 text-right">
-                    {time}
-                  </span>
-                ) : (
-                  <span className="flex-shrink-0 text-violet-300 mt-1 text-xs w-10 text-right">•</span>
-                )}
-                <div className="flex-1 min-w-0">
-                  {speaker && (
-                    <span className="text-[11px] font-medium text-gray-400 mr-1.5">{speaker}</span>
-                  )}
-                  <span className="text-sm text-gray-700 leading-relaxed">{point}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+const LANG_LABELS: Record<string, string> = {
+  en: "English", zh: "Mandarin", sg: "Singlish", ms: "Malay",
+};
 
 // ── Save banner ───────────────────────────────────────────────────────────────
 
@@ -227,8 +33,6 @@ function SaveBanner({ meeting }: { meeting: Meeting }) {
       if (!sb) { setState("hidden"); return; }
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { setState("hidden"); return; }
-
-      // Check if this meeting is already saved for this user
       const { data } = await sb.from("meetings").select("id").eq("id", meeting.id).maybeSingle();
       setState(data ? "hidden" : "save");
     }
@@ -241,7 +45,6 @@ function SaveBanner({ meeting }: { meeting: Meeting }) {
     if (!sb) { setState("save"); return; }
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { setState("save"); return; }
-
     const newId = `shared-${meeting.id}-${session.user.id.slice(0, 8)}`;
     await sb.from("meetings").upsert({
       ...meeting,
@@ -256,7 +59,7 @@ function SaveBanner({ meeting }: { meeting: Meeting }) {
   if (state === "hidden" || state === "checking") return null;
 
   return (
-    <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between gap-4">
+    <div className="bg-violet-600 text-white px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
       <p className="text-sm">
         {state === "saved"
           ? "Saved to your Personal folder in MeetingMind."
@@ -279,29 +82,33 @@ function SaveBanner({ meeting }: { meeting: Meeting }) {
 
 // ── Share page ─────────────────────────────────────────────────────────────────
 
-const LANG_LABELS: Record<string, string> = { en: "English", zh: "Mandarin", sg: "Singlish", ms: "Malay" };
-
 export default function ShareView({ meeting }: { meeting: Meeting }) {
+  const [activeTab, setActiveTab] = useState<Tab>("transcript");
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Save banner (signed-in users only) */}
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Save banner */}
       <SaveBanner meeting={meeting} />
 
       {/* Header */}
-      <header className="bg-violet-700 text-white px-6 py-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 mb-3 text-violet-300 text-xs font-medium uppercase tracking-widest">
+      <header className="bg-primary text-primary-foreground px-6 py-6 flex-shrink-0">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center gap-2 mb-2 text-primary-foreground/60 text-xs font-medium uppercase tracking-widest">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2.414a2 2 0 01.586-1.414z" />
             </svg>
             MeetingMind · Shared Meeting
           </div>
-          <h1 className="text-2xl font-bold">{meeting.title}</h1>
-          <p className="text-violet-200 text-sm mt-1">{meeting.date} · {meeting.duration}</p>
+          <h1 className="text-xl font-bold">{meeting.title}</h1>
+          <p className="text-primary-foreground/70 text-sm mt-1">
+            {meeting.date}{meeting.duration ? ` · ${meeting.duration}` : ""}
+          </p>
           {meeting.languages.length > 0 && (
             <div className="flex gap-2 mt-3 flex-wrap">
               {meeting.languages.map((l) => (
-                <span key={l} className="px-2 py-0.5 rounded-full bg-violet-500/40 text-violet-100 text-xs font-medium">
+                <span key={l}
+                  className="px-2 py-0.5 rounded-full bg-primary-foreground/20 text-primary-foreground/90 text-xs font-medium">
                   {LANG_LABELS[l] ?? l}
                 </span>
               ))}
@@ -310,94 +117,52 @@ export default function ShareView({ meeting }: { meeting: Meeting }) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-10">
+      {/* Tab bar */}
+      <div className="border-b border-border bg-card flex-shrink-0">
+        <div className="max-w-5xl mx-auto px-4 flex gap-1 overflow-x-auto">
+          {TABS.map(({ value, label, icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setActiveTab(value)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+                ${activeTab === value
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* Summary */}
-        {meeting.summary && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
-              Summary
-            </h2>
-            <MarkdownSummary text={meeting.summary} />
-          </section>
-        )}
-
-        {/* Action Items */}
-        {meeting.actions.length > 0 && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
-              Action Items
-            </h2>
-            <ol className="space-y-2">
-              {meeting.actions.map((a, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm">
-                  <span className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs font-bold
-                    ${a.done ? "bg-emerald-100 border-emerald-300 text-emerald-600" : "border-gray-300 text-gray-400"}`}>
-                    {a.done ? "✓" : i + 1}
-                  </span>
-                  <span className={`flex-1 ${a.done ? "line-through text-gray-400" : "text-gray-700"}`}>
-                    {a.text}
-                    {a.owner && (
-                      <span className="ml-2 text-gray-400 not-italic">— {a.owner}</span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
-
-        {/* Key Points (Pointers) */}
-        <PointersSection meeting={meeting} />
-
-        {/* Flowchart */}
-        {meeting.flow && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
-              Flowchart
-            </h2>
-            <FlowChart flow={meeting.flow} />
-          </section>
-        )}
-
-        {/* Transcript */}
-        {meeting.transcript.length > 0 && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 rounded-full bg-violet-500 inline-block" />
-              Transcript
-            </h2>
-            <div className="space-y-4">
-              {meeting.transcript.map((u, i) => {
-                const name = meeting.speakers[u.s] ?? u.s;
-                return (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700">
-                      {name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className="text-xs font-semibold text-violet-700">{name}</span>
-                        <span className="text-xs text-gray-400">{u.t}</span>
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        <ParsedText text={u.text} />
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        <footer className="pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-          Generated by MeetingMind · Read-only shared view
-        </footer>
+      {/* Tab content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          {activeTab === "transcript" && (
+            <TranscriptView meeting={meeting} />
+          )}
+          {activeTab === "pointers" && (
+            <PointersView meeting={meeting} />
+          )}
+          {activeTab === "summary" && (
+            <SummaryView meeting={meeting} onToggleAction={() => {}} />
+          )}
+          {activeTab === "flowchart" && (
+            <FlowchartView
+              meeting={meeting}
+              onRegenerate={async () => {}}
+              onRegeneratePointers={async () => {}}
+              hasApiKey={false}
+            />
+          )}
+        </div>
       </main>
+
+      <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground flex-shrink-0">
+        Generated by MeetingMind · Read-only shared view
+      </footer>
     </div>
   );
 }
