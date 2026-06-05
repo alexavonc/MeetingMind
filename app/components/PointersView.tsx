@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { Meeting } from "@/types";
 
 interface Props {
   meeting: Meeting;
+  onRecoverFrames?: () => Promise<boolean>;
 }
 
 function parseBullet(line: string) {
@@ -40,7 +42,9 @@ function activeFrameAt(
   return result;
 }
 
-export default function PointersView({ meeting }: Props) {
+export default function PointersView({ meeting, onRecoverFrames }: Props) {
+  const [recovering, setRecovering] = useState(false);
+  const [recoverResult, setRecoverResult] = useState<"found" | "none" | null>(null);
   if (!meeting.pointers) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
@@ -73,8 +77,37 @@ export default function PointersView({ meeting }: Props) {
   // Track which frame URL we last showed so we only display on screen-change
   let lastShownUrl: string | null = null;
 
+  async function handleRecover() {
+    if (!onRecoverFrames) return;
+    setRecovering(true);
+    const found = await onRecoverFrames();
+    setRecoverResult(found ? "found" : "none");
+    setRecovering(false);
+  }
+
   return (
     <div>
+      {/* Recovery banner — shown when frames are missing but may exist in Storage */}
+      {!hasFrames && meeting.videourl && onRecoverFrames && recoverResult !== "none" && (
+        <div className="mb-4 flex items-center gap-3 p-3 rounded-lg bg-secondary/60 border border-border text-sm">
+          <span className="text-muted-foreground flex-1">
+            {recoverResult === "found"
+              ? "Screenshots restored — scroll down to see them."
+              : "Screenshots from this video recording may still be in storage."}
+          </span>
+          {recoverResult !== "found" && (
+            <button
+              type="button"
+              onClick={handleRecover}
+              disabled={recovering}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium
+                hover:bg-primary/90 disabled:opacity-60 transition-colors"
+            >
+              {recovering ? "Recovering…" : "Recover screenshots"}
+            </button>
+          )}
+        </div>
+      )}
       {lines.map((line, i) => {
         const { time, speaker, point } = parseBullet(line);
 

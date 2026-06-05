@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 
+/** GET /api/store-frames?meetingId=xxx — list frames already in Storage for this meeting */
+export async function GET(req: NextRequest) {
+  const sb = getServerSupabase();
+  if (!sb) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
+
+  const meetingId = req.nextUrl.searchParams.get("meetingId");
+  if (!meetingId) return NextResponse.json({ error: "Missing meetingId" }, { status: 400 });
+
+  const { data, error } = await sb.storage.from("recordings").list(meetingId, { limit: 200 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const frameUrls = (data ?? [])
+    .filter((f: { name: string }) => /^frame-(\d+)\.jpg$/.test(f.name))
+    .map((f: { name: string }) => {
+      const timestamp = parseInt(f.name.replace("frame-", "").replace(".jpg", ""), 10);
+      const { data: urlData } = sb.storage.from("recordings").getPublicUrl(`${meetingId}/${f.name}`);
+      return { url: urlData.publicUrl, timestamp };
+    })
+    .sort((a: { timestamp: number }, b: { timestamp: number }) => a.timestamp - b.timestamp);
+
+  return NextResponse.json({ frameUrls });
+}
+
 export async function POST(req: NextRequest) {
   const sb = getServerSupabase();
   if (!sb) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });

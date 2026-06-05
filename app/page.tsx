@@ -172,6 +172,7 @@ export default function Home() {
     generateShareLink,
     regenerateFlow,
     regeneratePointers,
+    recoverFrames,
     findReplaceInMeeting,
     renameSpeaker,
     reassignUtterance,
@@ -449,7 +450,10 @@ export default function Home() {
                   onReassignUtterance={(idx, key) => reassignUtterance(selectedMeeting.id, idx, key)}
                 />
               ) : activeTab === "pointers" ? (
-                <PointersView meeting={selectedMeeting} />
+                <PointersView
+                  meeting={selectedMeeting}
+                  onRecoverFrames={() => recoverFrames(selectedMeeting.id)}
+                />
               ) : activeTab === "summary" ? (
                 <SummaryView
                   meeting={selectedMeeting}

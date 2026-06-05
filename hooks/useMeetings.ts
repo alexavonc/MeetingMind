@@ -902,6 +902,25 @@ export function useMeetings() {
     [settings, userId]
   );
 
+  /** Scan Supabase Storage for frames already uploaded for this meeting and re-link them. */
+  const recoverFrames = useCallback(async (meetingId: string): Promise<boolean> => {
+    const res = await fetch(`/api/store-frames?meetingId=${encodeURIComponent(meetingId)}`);
+    if (!res.ok) return false;
+    const { frameUrls } = await res.json() as { frameUrls: { url: string; timestamp: number }[] };
+    if (!frameUrls?.length) return false;
+    setMeetings((prev) => {
+      const updated = prev.map((m) => {
+        if (m.id !== meetingId) return m;
+        const patched = { ...m, frameurls: frameUrls };
+        dbUpdate(meetingId, { frameurls: frameUrls });
+        return patched;
+      });
+      saveDB(updated);
+      return updated;
+    });
+    return true;
+  }, []);
+
   const selectedMeeting = meetings.find((m) => m.id === selectedId) ?? null;
 
   return {
@@ -931,6 +950,7 @@ export function useMeetings() {
     generateShareLink,
     regenerateFlow,
     regeneratePointers,
+    recoverFrames,
     findReplaceInMeeting,
     processNotes,
     processUpload,
