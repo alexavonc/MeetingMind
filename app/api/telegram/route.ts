@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 
+export const maxDuration = 300;
+
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 const SG_PROMPT =
   "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.";
+
+function durationFromTranscript(transcript: { t: string }[]): string {
+  if (!transcript.length) return "0 min";
+  const last = transcript[transcript.length - 1].t;
+  const parts = last.split(":").map(Number);
+  const secs = parts.length === 3
+    ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+    : parts[0] * 60 + (parts[1] ?? 0);
+  return `${Math.max(1, Math.ceil(secs / 60))} min`;
+}
 
 // ── Telegram helpers ─────────────────────────────────────────────────────────
 
@@ -69,6 +81,7 @@ async function transcribe(
   form.append("model", "whisper-large-v3");
   form.append("response_format", "text");
   form.append("prompt", SG_PROMPT);
+  form.append("language", "en");
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${groqKey}` },
@@ -376,7 +389,7 @@ TRANSCRIPT: ${transcriptText}`;
       title: `Voice memo ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
       folder: "personal",
       date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
-      duration: `${Math.ceil(transcript.length * 0.5)} min`,
+      duration: durationFromTranscript(transcript),
       languages,
       speakers,
       transcript,

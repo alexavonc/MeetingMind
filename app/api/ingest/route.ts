@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 
+function durationFromTranscript(transcript: { t: string }[]): string {
+  if (!transcript.length) return "0 min";
+  const last = transcript[transcript.length - 1].t;
+  const parts = last.split(":").map(Number);
+  const secs = parts.length === 3
+    ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+    : parts[0] * 60 + (parts[1] ?? 0);
+  return `${Math.max(1, Math.ceil(secs / 60))} min`;
+}
+
 /**
  * POST /api/ingest
  *
@@ -126,7 +136,7 @@ SUMMARY: ${summary}`;
       title,
       folder,
       date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
-      duration: `${Math.ceil(diarised.transcript.length * 0.5)} min`,
+      duration: durationFromTranscript(diarised.transcript),
       languages,
       speakers: diarised.speakers,
       transcript: diarised.transcript,
