@@ -48,7 +48,25 @@ export async function POST(req: NextRequest) {
 
     if (!whisperKey) return NextResponse.json({ error: "Missing API key" }, { status: 400 });
 
-    await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 32k "${audioPath}"`);
+    // Check for audio stream before attempting extraction
+    try {
+      const { stdout } = await execAsync(`ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "${videoPath}"`);
+      if (!stdout.trim()) {
+        return NextResponse.json({ error: "This video has no audio track — MeetingMind needs audio to transcribe." }, { status: 422 });
+      }
+    } catch {
+      // ffprobe not available — proceed and let ffmpeg error naturally
+    }
+
+    try {
+      await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 32k "${audioPath}"`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("does not contain any stream") || msg.includes("Invalid argument")) {
+        return NextResponse.json({ error: "This video has no audio track — MeetingMind needs audio to transcribe." }, { status: 422 });
+      }
+      throw err;
+    }
 
     const audioBuffer = await readFile(audioPath);
     const audioFile = new File([audioBuffer], "audio.mp3", { type: "audio/mpeg" });
