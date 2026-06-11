@@ -678,13 +678,13 @@ export function useMeetings() {
           const isVideoFile = (f: File) =>
             f.type.startsWith("video/") || /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(f.name);
           const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-          // On mobile, route all files through server-side FFmpeg to avoid
-          // client-side arrayBuffer()/AudioContext which crashes Safari on large files
-          const needsServerSide = (f: File) => isVideoFile(f) || isMobile;
-
-          // ── Video files (or any file on mobile): chunked upload → server-side FFmpeg + Whisper ─────────
-          const audioFiles: File[] = [];
           const GROQ_LIMIT = 25 * 1024 * 1024;
+          // Route through server-side FFmpeg for: video, mobile, or large audio files.
+          // Large audio avoids the fragile client-side AudioContext/arrayBuffer path.
+          const needsServerSide = (f: File) => isVideoFile(f) || isMobile || f.size > GROQ_LIMIT;
+
+          // ── Server-side files: chunked upload → FFmpeg + Whisper ─────────────────
+          const audioFiles: File[] = [];
           const transcriptParts: string[] = [];
           const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 

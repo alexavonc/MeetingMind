@@ -381,7 +381,7 @@ export default function UploadModal({ open, onClose, processing, onSubmit, onSub
         {!processing.active && (
           <div className="px-6 pb-5 space-y-3">
             {processing.error && (
-              <div className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive">
+              <div className="px-3 py-2.5 rounded-lg bg-destructive/15 border border-destructive/40 text-sm text-destructive font-medium">
                 {processing.error}
               </div>
             )}
