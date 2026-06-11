@@ -58,8 +58,22 @@ export async function POST(req: NextRequest) {
       // ffprobe not available — proceed and let ffmpeg error naturally
     }
 
+    // Calculate a bitrate that keeps compressed audio under 24 MB (Groq limit is 25 MB).
+    // Minimum 16 kbps (sufficient for speech); falls back to 32 kbps if duration unknown.
+    let targetBitrate = 32000;
     try {
-      await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 32k "${audioPath}"`);
+      const { stdout: durStr } = await execAsync(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`
+      );
+      const duration = parseFloat(durStr.trim());
+      if (duration > 0) {
+        const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
+        targetBitrate = Math.max(16000, Math.min(32000, Math.floor(MAX_AUDIO_BYTES * 8 / duration)));
+      }
+    } catch { /* non-critical — use default */ }
+
+    try {
+      await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a ${targetBitrate} "${audioPath}"`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("does not contain any stream") || msg.includes("Invalid argument")) {
@@ -87,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const err = await res.text();
-      return NextResponse.json({ error: `Transcription failed: ${err}` }, { status: 502 });
+      return NextResponse.json({ error: `Transcription failed: ${err}` }, { status: 422 });
     }
 
     const text = await res.text();
@@ -113,7 +127,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text, videoUrl });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 422 });
   } finally {
     if (isLast) {
       await rm(dir, { recursive: true, force: true }).catch(() => {});

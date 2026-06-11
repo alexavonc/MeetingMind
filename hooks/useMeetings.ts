@@ -686,7 +686,7 @@ export function useMeetings() {
           // ── Server-side files: chunked upload → FFmpeg + Whisper ─────────────────
           const audioFiles: File[] = [];
           const transcriptParts: string[] = [];
-          const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+          const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB per chunk — stays within Railway's proxy body limit
 
           for (const f of rawFiles) {
             if (needsServerSide(f)) {
