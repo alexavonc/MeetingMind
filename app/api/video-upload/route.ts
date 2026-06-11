@@ -4,7 +4,7 @@ import { promisify } from "util";
 import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { uploadToR2 } from "@/lib/r2";
+import { uploadToR2, getR2Client } from "@/lib/r2";
 
 const execAsync = promisify(exec);
 export const maxDuration = 300;
@@ -92,9 +92,9 @@ export async function POST(req: NextRequest) {
 
     const text = await res.text();
 
-    // ── Store original video in R2 ────────────────────────────────────────────
+    // ── Store original video in R2 (only when R2 is configured) ─────────────
     let videoUrl = "";
-    if (meetingId) {
+    if (meetingId && getR2Client()) {
       try {
         const fileStats = await stat(videoPath);
         if (fileStats.size <= MAX_VIDEO_STORE_BYTES) {

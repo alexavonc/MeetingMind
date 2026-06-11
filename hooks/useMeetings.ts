@@ -714,8 +714,10 @@ export function useMeetings() {
                 }
                 const res = await fetch("/api/video-upload", { method: "POST", body: form });
                 if (!res.ok) {
-                  const { error } = await res.json() as { error: string };
-                  throw new Error(error || "Video upload failed");
+                  const raw = await res.text().catch(() => "");
+                  let errorMsg = "Upload failed";
+                  try { errorMsg = (JSON.parse(raw) as { error?: string }).error ?? raw; } catch { errorMsg = raw || errorMsg; }
+                  throw new Error(errorMsg);
                 }
                 if (i === totalChunks - 1) {
                   const { text, videoUrl } = await res.json() as { text: string; videoUrl?: string };
