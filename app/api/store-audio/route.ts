@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase";
+import { uploadToR2 } from "@/lib/r2";
 
 export async function POST(req: NextRequest) {
-  const sb = getServerSupabase();
-  if (!sb) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
-
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -15,17 +12,14 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.name.split(".").pop() ?? "audio";
-    const path = `${meetingId}/${Date.now()}.${ext}`;
-
+    const key = `${meetingId}/audio.${ext}`;
     const arrayBuffer = await file.arrayBuffer();
-    const { error } = await sb.storage
-      .from("recordings")
-      .upload(path, arrayBuffer, { contentType: file.type, upsert: true });
+    const buffer = Buffer.from(arrayBuffer);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const url = await uploadToR2(key, buffer, file.type || "audio/mpeg");
+    if (!url) return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
 
-    const { data } = sb.storage.from("recordings").getPublicUrl(path);
-    return NextResponse.json({ url: data.publicUrl });
+    return NextResponse.json({ url });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed";
     return NextResponse.json({ error: msg }, { status: 500 });

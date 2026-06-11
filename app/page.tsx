@@ -96,7 +96,7 @@ function AudioBar({
   async function handleAttach(file: File) {
     setUploading(true); setError(null);
     try { await onAttach(file); }
-    catch { setError("Upload failed — is the 'recordings' bucket created in Supabase?"); }
+    catch { setError("Upload failed — check R2 storage configuration"); }
     finally { setUploading(false); }
   }
 
