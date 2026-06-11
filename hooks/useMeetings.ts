@@ -353,7 +353,10 @@ export function useMeetings() {
     form.append("file", file);
     form.append("meetingId", meetingId);
     const res = await fetch("/api/store-audio", { method: "POST", body: form });
-    if (!res.ok) throw new Error("Audio upload failed");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(body.error ?? "Audio upload failed");
+    }
     const { url } = (await res.json()) as { url: string };
     setMeetings((prev) => {
       const updated = prev.map((m) => m.id === meetingId ? { ...m, audiourl: url } : m);
