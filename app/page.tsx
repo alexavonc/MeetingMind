@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings, List, Replace } from "lucide-react";
+import { Plus, Menu, X, FileAudio, AlignLeft, GitBranch, Mic, Paperclip, RefreshCw, Upload as UploadIcon, Settings, List, Replace, ArrowLeft } from "lucide-react";
 import { useMeetings } from "@/hooks/useMeetings";
 import { useAuth } from "@/hooks/useAuth";
 import Sidebar from "./components/Sidebar";
+import RecordingLibrary from "./components/RecordingLibrary";
 import TranscriptView from "./components/TranscriptView";
 import SummaryView from "./components/SummaryView";
 import FlowchartView from "./components/FlowchartView";
@@ -240,8 +241,8 @@ export default function Home() {
 
   return (
     <div className="flex h-full">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-64 flex-col border-r border-border flex-shrink-0 bg-card">
+      {/* ── DESKTOP: Column 1 — Folder sidebar (220px) ── */}
+      <aside className="hidden md:flex w-[220px] flex-col border-r border-border flex-shrink-0 bg-white">
         <Sidebar
           meetings={meetings}
           selectedId={selectedId}
@@ -260,16 +261,31 @@ export default function Home() {
         />
       </aside>
 
-      {/* Mobile sidebar overlay */}
+      {/* ── DESKTOP: Column 2 — Recording library (360px) ── */}
+      <div className="hidden md:flex w-[360px] flex-shrink-0">
+        <RecordingLibrary
+          meetings={meetings}
+          selectedFolder={selectedFolder}
+          selectedId={selectedId}
+          allFolders={folders}
+          onSelectMeeting={handleSelectMeeting}
+          onSelectFolder={setSelectedFolder}
+          onMoveMeeting={moveMeeting}
+          onDeleteMeeting={deleteMeeting}
+          onRenameMeeting={renameMeeting}
+        />
+      </div>
+
+      {/* ── MOBILE: Sidebar overlay ── */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-40">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card border-r border-border z-50">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <span className="font-semibold text-sm">Menu</span>
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card border-r border-border z-50 flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+              <span className="font-semibold text-sm">Folders</span>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
@@ -278,43 +294,96 @@ export default function Home() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <Sidebar
-              meetings={meetings}
-              selectedId={selectedId}
-              selectedFolder={selectedFolder}
-              folders={folders}
-              onSelectFolder={setSelectedFolder}
-              onSelectMeeting={handleSelectMeeting}
-              onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
-              onMoveMeeting={moveMeeting}
-              onDeleteMeeting={deleteMeeting}
-              onRenameMeeting={renameMeeting}
-              onCreateFolder={createFolder}
-              onRenameFolder={renameFolder}
-              onDeleteFolder={deleteFolder}
-            />
+            <div className="flex-1 overflow-hidden">
+              <Sidebar
+                meetings={meetings}
+                selectedId={selectedId}
+                selectedFolder={selectedFolder}
+                folders={folders}
+                onSelectFolder={(f) => { setSelectedFolder(f); setSidebarOpen(false); }}
+                onSelectMeeting={handleSelectMeeting}
+                onOpenSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
+                onMoveMeeting={moveMeeting}
+                onDeleteMeeting={deleteMeeting}
+                onRenameMeeting={renameMeeting}
+                onCreateFolder={createFolder}
+                onRenameFolder={renameFolder}
+                onDeleteFolder={deleteFolder}
+              />
+            </div>
           </aside>
         </div>
       )}
 
-      {/* Main content */}
+      {/* ── DESKTOP: Column 3 / MOBILE: full screen — Detail panel ── */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="md:hidden text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+
+        {/* ── MOBILE: Recording library (shown when no meeting selected) ── */}
+        {!selectedId && (
+          <div className="md:hidden flex flex-col flex-1 overflow-hidden">
+            {/* Mobile top bar */}
+            <header className="flex items-center gap-3 px-4 py-3 border-b border-border flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setRecordOpen(true)}
+                className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                aria-label="Record"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                aria-label="Upload"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </header>
+            <div className="flex-1 overflow-hidden">
+              <RecordingLibrary
+                meetings={meetings}
+                selectedFolder={selectedFolder}
+                selectedId={selectedId}
+                allFolders={folders}
+                onSelectMeeting={handleSelectMeeting}
+                onSelectFolder={setSelectedFolder}
+                onMoveMeeting={moveMeeting}
+                onDeleteMeeting={deleteMeeting}
+                onRenameMeeting={renameMeeting}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Detail panel header (desktop always, mobile only when meeting selected) ── */}
+        <header className={`flex items-center gap-3 px-4 py-3 border-b border-border flex-shrink-0 ${!selectedId ? "hidden md:flex" : "flex"}`}>
+          {/* Mobile: back button when meeting is selected */}
+          {selectedId && (
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="md:hidden text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Back to recordings"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
 
           <div className="flex-1 min-w-0">
             {selectedMeeting ? (
@@ -322,6 +391,9 @@ export default function Home() {
                 <h2 className="font-semibold text-base truncate">{selectedMeeting.title}</h2>
                 <span className="text-xs text-muted-foreground flex-shrink-0">
                   {selectedMeeting.date} · {selectedMeeting.duration}
+                  {Object.keys(selectedMeeting.speakers).length > 0 && (
+                    <> · {Object.keys(selectedMeeting.speakers).length} speaker{Object.keys(selectedMeeting.speakers).length !== 1 ? "s" : ""}</>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -335,7 +407,7 @@ export default function Home() {
               </div>
             ) : (
               <h2 className="font-semibold text-base text-muted-foreground">
-                Select a meeting
+                Select a recording
               </h2>
             )}
           </div>
@@ -389,12 +461,13 @@ export default function Home() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
                 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <UploadIcon className="w-4 h-4" />
               Upload
             </button>
           </div>
         </header>
 
+        {/* ── Detail content ── */}
         {selectedMeeting ? (
           <>
             {/* Audio bar — hidden when video is available (video player handles audio) */}
@@ -470,16 +543,17 @@ export default function Home() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-8">
+          /* Desktop empty state (hidden on mobile — mobile shows RecordingLibrary instead) */
+          <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-4 text-center p-8">
             <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center text-3xl">
               🎙️
             </div>
             <div>
               <p className="text-base font-medium text-foreground">
-                No meeting selected
+                No recording selected
               </p>
               <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-                Pick a meeting from the sidebar, or upload a new recording.
+                Pick a recording from the library, or upload a new one.
               </p>
             </div>
             <button
@@ -489,33 +563,35 @@ export default function Home() {
                 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              New meeting
+              New recording
             </button>
           </div>
         )}
       </main>
 
-      {/* Mobile FABs */}
-      <div className="md:hidden fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3">
-        <button
-          type="button"
-          onClick={() => setRecordOpen(true)}
-          className="w-12 h-12 rounded-full bg-red-500 text-white shadow-xl hover:bg-red-400
-            transition-colors flex items-center justify-center"
-          aria-label="Record meeting"
-        >
-          <Mic className="w-5 h-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setUploadOpen(true)}
-          className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl
-            hover:bg-primary/90 transition-colors flex items-center justify-center"
-          aria-label="Upload meeting"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      </div>
+      {/* Mobile FABs — only show when on recording library (no meeting selected) */}
+      {!selectedId && (
+        <div className="md:hidden fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3">
+          <button
+            type="button"
+            onClick={() => setRecordOpen(true)}
+            className="w-12 h-12 rounded-full bg-red-500 text-white shadow-xl hover:bg-red-400
+              transition-colors flex items-center justify-center"
+            aria-label="Record meeting"
+          >
+            <Mic className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl
+              hover:bg-primary/90 transition-colors flex items-center justify-center"
+            aria-label="Upload meeting"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
+      )}
 
       <UploadModal
         open={uploadOpen}
