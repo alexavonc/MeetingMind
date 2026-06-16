@@ -9,7 +9,6 @@ import {
   FolderInput,
   Pencil,
   Bookmark,
-  ChevronDown,
   ChevronRight,
   List,
   LayoutGrid,
@@ -215,7 +214,6 @@ export default function RecordingLibrary({
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameRef = useRef<HTMLInputElement>(null);
@@ -229,15 +227,6 @@ export default function RecordingLibrary({
   function commitRename(id: string) {
     if (renameValue.trim()) onRenameMeeting(id, renameValue.trim());
     setRenamingId(null);
-  }
-
-  function toggleFilter(name: string) {
-    setActiveFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
   }
 
   // Breadcrumb segments from selected folder
@@ -268,8 +257,6 @@ export default function RecordingLibrary({
     // newest: reverse date sort
     return b.date.localeCompare(a.date);
   });
-
-  const FILTER_CHIPS = ["Type", "Language", "Date", "Team", "More Filters"];
 
   return (
     <div className="flex flex-col h-full w-[360px] flex-shrink-0 border-r border-border bg-white">
@@ -324,26 +311,6 @@ export default function RecordingLibrary({
         </div>
       </div>
 
-      {/* Filter chips */}
-      <div className="px-4 pb-3 flex-shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          {FILTER_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              onClick={() => toggleFilter(chip)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 transition-colors ${
-                activeFilters.has(chip)
-                  ? "bg-violet-50 text-violet-700 border-violet-200"
-                  : "bg-white text-muted-foreground border-border hover:bg-gray-50"
-              }`}
-            >
-              {chip}
-              <ChevronDown className="w-3 h-3" />
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* Count + sort + view toggle */}
       <div className="px-4 pb-3 flex items-center justify-between gap-2 flex-shrink-0">
