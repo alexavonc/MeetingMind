@@ -224,6 +224,7 @@ export default function RecordingLibrary({
   const [renameValue, setRenameValue] = useState("");
   const [creatingSubfolder, setCreatingSubfolder] = useState(false);
   const [newSubfolderName, setNewSubfolderName] = useState("");
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
   const newSubfolderRef = useRef<HTMLInputElement>(null);
 
@@ -419,10 +420,21 @@ export default function RecordingLibrary({
                         key={path}
                         type="button"
                         onClick={() => onSelectFolder(path)}
-                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border
-                          bg-gray-50 hover:bg-violet-50 hover:border-violet-200 transition-colors text-left group"
+                        onDragOver={(e) => { e.preventDefault(); setDragOverFolder(path); }}
+                        onDragLeave={() => setDragOverFolder(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const id = e.dataTransfer.getData("text/plain");
+                          if (id) onMoveMeeting(id, path);
+                          setDragOverFolder(null);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors text-left group ${
+                          dragOverFolder === path
+                            ? "bg-violet-100 border-violet-400 scale-[1.02]"
+                            : "border-border bg-gray-50 hover:bg-violet-50 hover:border-violet-200"
+                        }`}
                       >
-                        <FolderIcon className="w-4 h-4 text-violet-400 flex-shrink-0 group-hover:text-violet-600" />
+                        <FolderIcon className={`w-4 h-4 flex-shrink-0 ${dragOverFolder === path ? "text-violet-600" : "text-violet-400 group-hover:text-violet-600"}`} />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-foreground truncate">{name}</p>
                           <p className="text-[10px] text-muted-foreground">{count} item{count !== 1 ? "s" : ""}</p>
@@ -471,7 +483,12 @@ export default function RecordingLibrary({
                     return (
                       <div
                         key={meeting.id}
-                        className={`group relative flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", meeting.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        className={`group relative flex items-start gap-3 p-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-colors ${
                           isSelected
                             ? "bg-violet-50 border border-violet-200"
                             : "hover:bg-gray-50 border border-transparent"

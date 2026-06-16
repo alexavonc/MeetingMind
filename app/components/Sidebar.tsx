@@ -125,6 +125,7 @@ interface TreeNodeProps {
   onCreateFolder: (name: string) => void;
   onRenameFolder: (oldName: string, newName: string) => void;
   onDeleteFolder: (name: string) => void;
+  onMoveMeeting: (id: string, folder: Folder) => void;
   meetings: Meeting[];
 }
 
@@ -138,6 +139,7 @@ function TreeNode({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
+  onMoveMeeting,
   meetings,
 }: TreeNodeProps) {
   const isSelected = selectedFolder === node.path;
@@ -145,6 +147,7 @@ function TreeNode({
   const hasChildren = node.children.length > 0;
 
   const [hovered, setHovered] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [renamingThis, setRenamingThis] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -233,8 +236,18 @@ function TreeNode({
                 onSelectFolder(node.path);
                 if (hasChildren && !isExpanded) onToggleExpand(node.path);
               }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                const id = e.dataTransfer.getData("text/plain");
+                if (id) onMoveMeeting(id, node.path);
+              }}
               className={`flex-1 flex items-center gap-1.5 py-1.5 rounded-lg text-xs transition-colors min-w-0 ${
-                isSelected
+                isDragOver
+                  ? "bg-violet-100 text-violet-700 ring-1 ring-violet-400"
+                  : isSelected
                   ? "bg-violet-50 text-violet-700 font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-gray-50"
               }`}
@@ -387,6 +400,7 @@ function TreeNode({
               onCreateFolder={onCreateFolder}
               onRenameFolder={onRenameFolder}
               onDeleteFolder={onDeleteFolder}
+              onMoveMeeting={onMoveMeeting}
               meetings={meetings}
             />
           ))}
@@ -404,7 +418,7 @@ export default function Sidebar({
   onSelectFolder,
   onSelectMeeting: _onSelectMeeting,
   onOpenSettings,
-  onMoveMeeting: _onMoveMeeting,
+  onMoveMeeting,
   onDeleteMeeting: _onDeleteMeeting,
   onRenameMeeting: _onRenameMeeting,
   onCreateFolder,
@@ -554,6 +568,7 @@ export default function Sidebar({
             onCreateFolder={onCreateFolder}
             onRenameFolder={onRenameFolder}
             onDeleteFolder={onDeleteFolder}
+            onMoveMeeting={onMoveMeeting}
             meetings={meetings}
           />
         ))}
