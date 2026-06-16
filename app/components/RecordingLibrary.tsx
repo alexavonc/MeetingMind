@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Search,
   FileAudio,
+  Folder,
   MoreVertical,
   Trash2,
   FolderInput,
@@ -12,6 +13,9 @@ import {
   ChevronRight,
   List,
   LayoutGrid,
+  Plus,
+  Check,
+  X,
 } from "lucide-react";
 import type { Meeting, Language, Folder } from "@/types";
 
@@ -25,6 +29,7 @@ interface Props {
   onMoveMeeting: (id: string, folder: Folder) => void;
   onDeleteMeeting: (id: string) => void;
   onRenameMeeting: (id: string, title: string) => void;
+  onCreateFolder: (name: string) => void;
 }
 
 const LANG_BADGES: Record<Language, { label: string; className: string }> = {
@@ -210,13 +215,21 @@ export default function RecordingLibrary({
   onMoveMeeting,
   onDeleteMeeting,
   onRenameMeeting,
+  onCreateFolder,
 }: Props) {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [creatingSubfolder, setCreatingSubfolder] = useState(false);
+  const [newSubfolderName, setNewSubfolderName] = useState("");
   const renameRef = useRef<HTMLInputElement>(null);
+  const newSubfolderRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (creatingSubfolder) setTimeout(() => newSubfolderRef.current?.focus(), 20);
+  }, [creatingSubfolder]);
 
   function startRename(meeting: Meeting) {
     setRenamingId(meeting.id);
@@ -229,34 +242,54 @@ export default function RecordingLibrary({
     setRenamingId(null);
   }
 
-  // Breadcrumb segments from selected folder
-  const breadcrumbs = selectedFolder === ""
-    ? []
-    : selectedFolder.split("/");
+  function submitSubfolder() {
+    const name = newSubfolderName.trim();
+    if (name) {
+      const newPath = selectedFolder ? `${selectedFolder}/${name}` : name;
+      onCreateFolder(newPath);
+      onSelectFolder(newPath);
+    }
+    setCreatingSubfolder(false);
+    setNewSubfolderName("");
+  }
 
-  // Filter meetings to those in the selected folder (and subfolders if "All Meetings")
-  const folderMeetings = selectedFolder === ""
-    ? meetings
-    : meetings.filter(
+  // Breadcrumb segments
+  const breadcrumbs = selectedFolder === "" ? [] : selectedFolder.split("/");
+
+  // Direct subfolders of the current folder
+  const directSubfolders = allFolders.filter((f) => {
+    if (selectedFolder === "") return !f.includes("/");
+    return (
+      f.startsWith(selectedFolder + "/") &&
+      !f.slice(selectedFolder.length + 1).includes("/")
+    );
+  }).sort();
+
+  // Count meetings (including in subfolders) for a given folder path
+  function folderCount(path: string) {
+    return meetings.filter(
+      (m) => m.folder === path || m.folder.startsWith(path + "/")
+    ).length;
+  }
+
+  // Meetings: when searching show all in subtree, otherwise only direct
+  const baseMeetings = search.trim()
+    ? meetings.filter(
         (m) =>
-          m.folder === selectedFolder ||
-          m.folder.startsWith(selectedFolder + "/")
-      );
-
-  // Apply search
-  const searched = search.trim()
-    ? folderMeetings.filter((m) =>
-        m.title.toLowerCase().includes(search.toLowerCase())
+          (selectedFolder === ""
+            ? true
+            : m.folder === selectedFolder || m.folder.startsWith(selectedFolder + "/")) &&
+          m.title.toLowerCase().includes(search.toLowerCase())
       )
-    : folderMeetings;
+    : meetings.filter((m) => m.folder === selectedFolder);
 
-  // Sort
-  const sorted = [...searched].sort((a, b) => {
+  const sorted = [...baseMeetings].sort((a, b) => {
     if (sortOrder === "title") return a.title.localeCompare(b.title);
     if (sortOrder === "oldest") return a.date.localeCompare(b.date);
-    // newest: reverse date sort
     return b.date.localeCompare(a.date);
   });
+
+  const hasContent = directSubfolders.length > 0 || sorted.length > 0;
 
   return (
     <div className="flex flex-col h-full w-[360px] flex-shrink-0 border-r border-border bg-white">
@@ -311,146 +344,203 @@ export default function RecordingLibrary({
         </div>
       </div>
 
-
-      {/* Count + sort + view toggle */}
-      <div className="px-4 pb-3 flex items-center justify-between gap-2 flex-shrink-0">
-        <span className="text-xs text-muted-foreground">
-          {sorted.length} recording{sorted.length !== 1 ? "s" : ""}
-        </span>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground">Sort:</span>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-              className="text-xs text-foreground bg-transparent border-0 focus:outline-none cursor-pointer pr-1 font-medium"
-            >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="title">Title</option>
-            </select>
-          </div>
-          <div className="flex items-center border border-border rounded-md overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`p-1 transition-colors ${
-                viewMode === "list"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-label="List view"
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`p-1 transition-colors ${
-                viewMode === "grid"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              aria-label="Grid view"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Recording list */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1">
-        {sorted.length === 0 ? (
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
+        {!hasContent && !creatingSubfolder ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center py-16">
             <FileAudio className="w-10 h-10 text-muted-foreground/40" />
             <div>
-              <p className="text-sm font-medium text-foreground">No recordings yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Upload a recording to get started.
-              </p>
+              <p className="text-sm font-medium text-foreground">Nothing here yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Upload a recording or create a subfolder.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setCreatingSubfolder(true)}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New subfolder
+            </button>
           </div>
         ) : (
-          sorted.map((meeting) => {
-            const isSelected = selectedId === meeting.id;
-            const isRenaming = renamingId === meeting.id;
-            return (
-              <div
-                key={meeting.id}
-                className={`group relative flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
-                  isSelected
-                    ? "bg-violet-50 border border-violet-200"
-                    : "hover:bg-gray-50 border border-transparent"
-                }`}
-                onClick={() => !isRenaming && onSelectMeeting(meeting.id)}
-              >
-                <Thumbnail meeting={meeting} />
+          <div className="space-y-4 pt-1">
+            {/* Subfolders section */}
+            {(directSubfolders.length > 0 || creatingSubfolder) && !search.trim() && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Folders
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCreatingSubfolder(true)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="New subfolder"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-1">
-                    {isRenaming ? (
-                      <input
-                        ref={renameRef}
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={() => commitRename(meeting.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            commitRename(meeting.id);
-                          }
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 text-sm font-medium bg-card border border-primary/50 rounded px-1.5 py-0.5
-                          focus:outline-none focus:ring-1 focus:ring-primary text-foreground min-w-0"
-                        autoFocus
-                      />
-                    ) : (
-                      <p className="text-sm font-medium leading-snug flex-1 truncate text-foreground">
-                        {meeting.title}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                {/* New subfolder input */}
+                {creatingSubfolder && (
+                  <div className="flex items-center gap-1 mb-1.5 px-1">
+                    <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <input
+                      ref={newSubfolderRef}
+                      type="text"
+                      value={newSubfolderName}
+                      onChange={(e) => setNewSubfolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitSubfolder();
+                        if (e.key === "Escape") { setCreatingSubfolder(false); setNewSubfolderName(""); }
+                      }}
+                      placeholder="Subfolder name…"
+                      className="flex-1 text-xs bg-input border border-primary/50 rounded px-2 py-1
+                        focus:outline-none focus:ring-1 focus:ring-primary text-foreground min-w-0"
+                    />
+                    <button type="button" onClick={submitSubfolder} className="text-primary p-0.5 flex-shrink-0">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setCreatingSubfolder(false); setNewSubfolderName(""); }}
+                      className="text-muted-foreground p-0.5 flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {directSubfolders.map((path) => {
+                    const name = path.split("/").pop() ?? path;
+                    const count = folderCount(path);
+                    return (
                       <button
+                        key={path}
                         type="button"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 rounded text-muted-foreground hover:text-violet-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        aria-label="Bookmark"
+                        onClick={() => onSelectFolder(path)}
+                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border
+                          bg-gray-50 hover:bg-violet-50 hover:border-violet-200 transition-colors text-left group"
                       >
-                        <Bookmark className="w-3 h-3" />
+                        <Folder className="w-4 h-4 text-violet-400 flex-shrink-0 group-hover:text-violet-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground truncate">{name}</p>
+                          <p className="text-[10px] text-muted-foreground">{count} item{count !== 1 ? "s" : ""}</p>
+                        </div>
                       </button>
-                      <MeetingMenu
-                        meeting={meeting}
-                        currentFolder={selectedFolder}
-                        allFolders={allFolders}
-                        onMove={(folder) => onMoveMeeting(meeting.id, folder)}
-                        onDelete={() => onDeleteMeeting(meeting.id)}
-                        onRename={() => startRename(meeting)}
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {meeting.date} · {meeting.duration}
-                  </p>
-
-                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                    {meeting.languages.map((lang) => (
-                      <span
-                        key={lang}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border font-medium leading-none ${LANG_BADGES[lang].className}`}
-                      >
-                        {LANG_BADGES[lang].label}
-                      </span>
-                    ))}
-                    <SpeakerBadges speakers={meeting.speakers} />
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })
+            )}
+
+            {/* Recordings section */}
+            {sorted.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Recordings
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                      className="text-[11px] text-muted-foreground bg-transparent border-0 focus:outline-none cursor-pointer font-medium"
+                    >
+                      <option value="newest">Newest</option>
+                      <option value="oldest">Oldest</option>
+                      <option value="title">Title</option>
+                    </select>
+                    <div className="flex items-center border border-border rounded overflow-hidden">
+                      <button type="button" onClick={() => setViewMode("list")}
+                        className={`p-0.5 transition-colors ${viewMode === "list" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                        <List className="w-3 h-3" />
+                      </button>
+                      <button type="button" onClick={() => setViewMode("grid")}
+                        className={`p-0.5 transition-colors ${viewMode === "grid" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                        <LayoutGrid className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  {sorted.map((meeting) => {
+                    const isSelected = selectedId === meeting.id;
+                    const isRenaming = renamingId === meeting.id;
+                    return (
+                      <div
+                        key={meeting.id}
+                        className={`group relative flex items-start gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                          isSelected
+                            ? "bg-violet-50 border border-violet-200"
+                            : "hover:bg-gray-50 border border-transparent"
+                        }`}
+                        onClick={() => !isRenaming && onSelectMeeting(meeting.id)}
+                      >
+                        <Thumbnail meeting={meeting} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            {isRenaming ? (
+                              <input
+                                ref={renameRef}
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={() => commitRename(meeting.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") { e.preventDefault(); commitRename(meeting.id); }
+                                  if (e.key === "Escape") setRenamingId(null);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1 text-sm font-medium bg-card border border-primary/50 rounded px-1.5 py-0.5
+                                  focus:outline-none focus:ring-1 focus:ring-primary text-foreground min-w-0"
+                                autoFocus
+                              />
+                            ) : (
+                              <p className="text-sm font-medium leading-snug flex-1 truncate text-foreground">
+                                {meeting.title}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 rounded text-muted-foreground hover:text-violet-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              >
+                                <Bookmark className="w-3 h-3" />
+                              </button>
+                              <MeetingMenu
+                                meeting={meeting}
+                                currentFolder={selectedFolder}
+                                allFolders={allFolders}
+                                onMove={(folder) => onMoveMeeting(meeting.id, folder)}
+                                onDelete={() => onDeleteMeeting(meeting.id)}
+                                onRename={() => startRename(meeting)}
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {meeting.date} · {meeting.duration}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                            {meeting.languages.map((lang) => (
+                              <span
+                                key={lang}
+                                className={`text-[10px] px-1.5 py-0.5 rounded border font-medium leading-none ${LANG_BADGES[lang].className}`}
+                              >
+                                {LANG_BADGES[lang].label}
+                              </span>
+                            ))}
+                            <SpeakerBadges speakers={meeting.speakers} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

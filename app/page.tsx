@@ -273,6 +273,7 @@ export default function Home() {
           onMoveMeeting={moveMeeting}
           onDeleteMeeting={deleteMeeting}
           onRenameMeeting={renameMeeting}
+          onCreateFolder={createFolder}
         />
       </div>
 
@@ -366,6 +367,7 @@ export default function Home() {
                 onMoveMeeting={moveMeeting}
                 onDeleteMeeting={deleteMeeting}
                 onRenameMeeting={renameMeeting}
+                onCreateFolder={createFolder}
               />
             </div>
           </div>
