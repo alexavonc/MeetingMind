@@ -58,17 +58,18 @@ export async function POST(req: NextRequest) {
       // ffprobe not available — proceed and let ffmpeg error naturally
     }
 
-    // Calculate a bitrate that keeps compressed audio under 24 MB (Groq limit is 25 MB).
-    // Minimum 16 kbps (sufficient for speech); falls back to 32 kbps if duration unknown.
-    let targetBitrate = 32000;
+    // Calculate a bitrate that keeps compressed audio under 22 MB (5 MB headroom below Groq's 25 MB limit).
+    // Falls back to 16 kbps if duration is unknown (handles up to ~3.5 h without exceeding 25 MB).
+    let audioDuration = 0;
+    let targetBitrate = 16000;
     try {
       const { stdout: durStr } = await execAsync(
         `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`
       );
-      const duration = parseFloat(durStr.trim());
-      if (duration > 0) {
-        const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
-        targetBitrate = Math.max(16000, Math.min(32000, Math.floor(MAX_AUDIO_BYTES * 8 / duration)));
+      audioDuration = parseFloat(durStr.trim());
+      if (audioDuration > 0) {
+        const MAX_AUDIO_BYTES = 22 * 1024 * 1024;
+        targetBitrate = Math.max(8000, Math.floor(MAX_AUDIO_BYTES * 8 / audioDuration));
       }
     } catch { /* non-critical — use default */ }
 
@@ -80,6 +81,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "This video has no audio track — MeetingMind needs audio to transcribe." }, { status: 422 });
       }
       throw err;
+    }
+
+    // Safety check: if the encoded file still exceeds 24 MB (can happen when the bitrate
+    // estimate was inaccurate or ffprobe failed), re-encode from source at the exact safe rate.
+    const encodedSize = (await stat(audioPath)).size;
+    if (encodedSize > 24 * 1024 * 1024) {
+      const safeBitrate = audioDuration > 0
+        ? Math.max(6000, Math.floor(22 * 1024 * 1024 * 8 / audioDuration))
+        : 8000;
+      await execAsync(`ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a ${safeBitrate} "${audioPath}"`);
     }
 
     const audioBuffer = await readFile(audioPath);
