@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Search,
   FileAudio,
-  Folder,
+  Folder as FolderIcon,
   MoreVertical,
   Trash2,
   FolderInput,
@@ -306,7 +306,7 @@ export default function RecordingLibrary({
         >
           All Recordings
         </button>
-        {breadcrumbs.map((segment, i) => {
+        {breadcrumbs.map((segment: string, i: number) => {
           const partialPath = breadcrumbs.slice(0, i + 1).join("/");
           const isLast = i === breadcrumbs.length - 1;
           return (
@@ -383,7 +383,7 @@ export default function RecordingLibrary({
                 {/* New subfolder input */}
                 {creatingSubfolder && (
                   <div className="flex items-center gap-1 mb-1.5 px-1">
-                    <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <FolderIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     <input
                       ref={newSubfolderRef}
                       type="text"
@@ -422,7 +422,7 @@ export default function RecordingLibrary({
                         className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border
                           bg-gray-50 hover:bg-violet-50 hover:border-violet-200 transition-colors text-left group"
                       >
-                        <Folder className="w-4 h-4 text-violet-400 flex-shrink-0 group-hover:text-violet-600" />
+                        <FolderIcon className="w-4 h-4 text-violet-400 flex-shrink-0 group-hover:text-violet-600" />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-foreground truncate">{name}</p>
                           <p className="text-[10px] text-muted-foreground">{count} item{count !== 1 ? "s" : ""}</p>
