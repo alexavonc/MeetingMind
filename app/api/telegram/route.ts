@@ -5,7 +5,7 @@ export const maxDuration = 300;
 
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const CLAUDE_MODEL = "claude-sonnet-4-6";
 const SG_PROMPT =
   "Singapore English meeting. Code-switching between English, Singlish, and Mandarin Chinese. Common Singlish: lah, lor, meh, can, cannot, sia, walao, alamak, shiok, confirm, already.";
 

@@ -15,7 +15,7 @@ async function callClaude(
   apiKey: string,
   prompt: string,
   maxTokens = 2048,
-  model = "claude-sonnet-4-20250514"
+  model = "claude-sonnet-4-6"
 ): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",

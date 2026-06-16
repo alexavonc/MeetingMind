@@ -4,7 +4,7 @@ export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, prompt, maxTokens = 2048, model = "claude-sonnet-4-20250514" } = (await req.json()) as {
+    const { apiKey, prompt, maxTokens = 2048, model = "claude-sonnet-4-6" } = (await req.json()) as {
       apiKey: string;
       prompt: string;
       maxTokens?: number;
