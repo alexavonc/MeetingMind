@@ -340,6 +340,42 @@ export async function analyzeVisuals(
   }
 }
 
+type PointersGroup = { title: string; timestamp?: string; points: string[] };
+
+const MAX_POINTERS_CHARS = 15_000; // ≈ 20 min of speech per chunk
+
+async function genPointersChunk(
+  apiKey: string,
+  text: string
+): Promise<PointersGroup[]> {
+  const prompt = `Analyze this meeting transcript segment and extract key points, organized by main theme.
+
+Return ONLY valid JSON (no backticks, no markdown):
+{"groups":[{"title":"Theme Title","timestamp":"0:15","points":["• [0:15] Speaker — specific point","• [0:30] Speaker — another point"]}]}
+
+Rules:
+- 2–5 groups covering distinct themes in this segment
+- Each group: 2–4 sub-points
+- Sub-point format exactly: "• [MM:SS] Speaker — concise statement"
+- Chronological order within each group
+- "timestamp" = timestamp of the first point in that group
+- Cover every significant statement, decision, number, or named concept
+- Skip filler, repeated ideas, and pleasantries
+
+TRANSCRIPT SEGMENT:
+${text}`;
+
+  const raw = await callClaude(apiKey, prompt, 4000, "claude-haiku-4-5-20251001");
+  const toParse = extractJSON(raw);
+  for (const candidate of [toParse, raw]) {
+    try {
+      const parsed = JSON.parse(candidate) as { groups?: PointersGroup[] };
+      if (Array.isArray(parsed?.groups)) return parsed.groups;
+    } catch { /* try next */ }
+  }
+  return [];
+}
+
 export async function genPointers(
   apiKey: string,
   transcript: Utterance[],
@@ -349,44 +385,25 @@ export async function genPointers(
     .map((u) => `[${u.t}] ${speakers[u.s] ?? u.s}: ${u.text}`)
     .join("\n");
 
-  const prompt = `Analyze this meeting transcript and extract all key points, organized by main theme.
-
-Return ONLY valid JSON (no backticks, no markdown):
-{"groups":[{"title":"Theme Title","timestamp":"0:15","points":["• [0:15] Speaker — specific point","• [0:30] Speaker — another point"]}]}
-
-Rules:
-- 4–8 groups total, each covering a distinct theme or phase of the meeting
-- Each group: 2–4 sub-points (more only if clearly needed)
-- Sub-point format exactly: "• [MM:SS] Speaker — concise statement"
-- Chronological order within each group
-- "timestamp" = timestamp of the first point in that group
-- Cover every significant statement, decision, number, or named concept
-- Skip filler, repeated ideas, and pleasantries
-
-TRANSCRIPT:
-${text}`;
-
-  const raw = await callClaude(apiKey, prompt, 8000, "claude-haiku-4-5-20251001");
-  const toParse = extractJSON(raw);
-
-  // Try parsing the extracted JSON first; fall back to parsing raw directly
-  // (handles cases where extractJSON trimmed too aggressively).
-  let data: { groups: Array<{ title: string; timestamp?: string; points: string[] }> } | null = null;
-  for (const candidate of [toParse, raw]) {
-    try {
-      const parsed = JSON.parse(candidate) as { groups?: Array<{ title: string; timestamp?: string; points: string[] }> };
-      if (Array.isArray(parsed?.groups)) { data = parsed as { groups: Array<{ title: string; timestamp?: string; points: string[] }> }; break; }
-    } catch { /* try next */ }
+  // Short transcript — single call
+  if (text.length <= MAX_POINTERS_CHARS) {
+    const groups = await genPointersChunk(apiKey, text);
+    if (!groups.length) return { groups: "", flat: "" };
+    const data = { groups };
+    return { groups: JSON.stringify(data), flat: groups.flatMap((g) => g.points).join("\n") };
   }
 
-  if (data) {
-    const flat = data.groups.flatMap((g) => g.points).join("\n");
-    return { groups: JSON.stringify(data), flat };
+  // Long transcript — chunk it and merge results (same approach as diarisation)
+  const chunks = splitTranscript(text, MAX_POINTERS_CHARS);
+  const allGroups: PointersGroup[] = [];
+  for (const chunk of chunks) {
+    const chunkGroups = await genPointersChunk(apiKey, chunk);
+    allGroups.push(...chunkGroups);
   }
 
-  // Claude returned plain text bullets (non-JSON) — use as-is only if it looks like bullet points
-  const looksLikeBullets = /^[•\-*\[]/m.test(raw);
-  return { groups: "", flat: looksLikeBullets ? raw : "" };
+  if (!allGroups.length) return { groups: "", flat: "" };
+  const data = { groups: allGroups };
+  return { groups: JSON.stringify(data), flat: allGroups.flatMap((g) => g.points).join("\n") };
 }
 
 export async function genFlow(

@@ -49,10 +49,10 @@ function estimatePointersTime(duration: string): string {
     parseInt(duration.match(/(\d+)\s*min/)?.[1] ?? "0");
   if (!totalMins) return "under a minute";
   if (totalMins <= 20) return "under a minute";
-  if (totalMins <= 45) return "about a minute";
+  if (totalMins <= 40) return "about a minute";
   if (totalMins <= 90) return "1–2 minutes";
-  if (totalMins <= 150) return "2–3 minutes";
-  return "3–5 minutes";
+  if (totalMins <= 180) return "2–4 minutes";
+  return "4–6 minutes";
 }
 
 export default function PointersView({ meeting, onRecoverFrames }: Props) {
