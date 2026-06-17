@@ -528,6 +528,7 @@ export default function Home() {
                 <PointersView
                   meeting={selectedMeeting}
                   onRecoverFrames={() => recoverFrames(selectedMeeting.id)}
+                  onRegeneratePointers={settings.claudeKey ? () => regeneratePointers(selectedMeeting.id) : undefined}
                 />
               ) : activeTab === "summary" ? (
                 <SummaryView

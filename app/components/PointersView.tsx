@@ -7,6 +7,7 @@ import type { Meeting } from "@/types";
 interface Props {
   meeting: Meeting;
   onRecoverFrames?: () => Promise<boolean>;
+  onRegeneratePointers?: () => Promise<void>;
 }
 
 function parseBullet(line: string) {
@@ -55,9 +56,10 @@ function estimatePointersTime(duration: string): string {
   return "4–6 minutes";
 }
 
-export default function PointersView({ meeting, onRecoverFrames }: Props) {
+export default function PointersView({ meeting, onRecoverFrames, onRegeneratePointers }: Props) {
   const [recovering, setRecovering] = useState(false);
   const [recoverResult, setRecoverResult] = useState<"found" | "none" | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   if (!meeting.pointers) {
     const eta = meeting.duration ? estimatePointersTime(meeting.duration) : null;
     return (
@@ -112,8 +114,33 @@ export default function PointersView({ meeting, onRecoverFrames }: Props) {
     setRecovering(false);
   }
 
+  async function handleRegenerate() {
+    if (!onRegeneratePointers) return;
+    setRegenerating(true);
+    try { await onRegeneratePointers(); } finally { setRegenerating(false); }
+  }
+
   return (
     <div>
+      {/* Regenerate button */}
+      {onRegeneratePointers && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
+              bg-secondary hover:bg-secondary/80 text-foreground border border-border
+              transition-colors disabled:opacity-50"
+          >
+            <svg className={`w-3 h-3 ${regenerating ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" />
+            </svg>
+            {regenerating ? "Regenerating…" : "Regenerate"}
+          </button>
+        </div>
+      )}
       {/* Recovery banner — shown when frames are missing but may exist in Storage */}
       {!hasFrames && onRecoverFrames && recoverResult !== "none" && (
         <div className="mb-4 flex items-center gap-3 p-3 rounded-lg bg-secondary/60 border border-border text-sm">
