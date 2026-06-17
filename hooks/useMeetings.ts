@@ -801,10 +801,9 @@ export function useMeetings() {
             ? allParts[0]
             : allParts.map((p, i) => `[Part ${i + 1}]\n${p}`).join("\n\n");
 
-          // Prepend visual context from video frames so Claude incorporates it
-          if (visualContext) {
-            raw = `[VISUAL CONTEXT FROM VIDEO FRAMES]\n${visualContext.trim()}\n[END VISUAL CONTEXT]\n\n${raw}`;
-          }
+          // Visual context is stored separately as visualnotes and used in pointers/summary.
+          // Do NOT inject it into the diarisation input — Claude would transcribe the
+          // frame descriptions as if they were spoken utterances.
 
           setProcessing({ active: true, step: "diarising", error: null });
         }
