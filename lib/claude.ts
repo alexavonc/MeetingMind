@@ -366,17 +366,27 @@ Rules:
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 4000);
+  const raw = await callClaude(apiKey, prompt, 8000);
   const toParse = extractJSON(raw);
 
-  try {
-    const data = JSON.parse(toParse) as { groups: Array<{ title: string; timestamp?: string; points: string[] }> };
-    const flat = data.groups.flatMap((g) => g.points).join("\n");
-    return { groups: toParse, flat };
-  } catch {
-    // Claude returned non-JSON — treat raw output as flat bullet list
-    return { groups: "", flat: raw };
+  // Try parsing the extracted JSON first; fall back to parsing raw directly
+  // (handles cases where extractJSON trimmed too aggressively).
+  let data: { groups: Array<{ title: string; timestamp?: string; points: string[] }> } | null = null;
+  for (const candidate of [toParse, raw]) {
+    try {
+      const parsed = JSON.parse(candidate) as { groups?: Array<{ title: string; timestamp?: string; points: string[] }> };
+      if (Array.isArray(parsed?.groups)) { data = parsed as { groups: Array<{ title: string; timestamp?: string; points: string[] }> }; break; }
+    } catch { /* try next */ }
   }
+
+  if (data) {
+    const flat = data.groups.flatMap((g) => g.points).join("\n");
+    return { groups: JSON.stringify(data), flat };
+  }
+
+  // Claude returned plain text bullets (non-JSON) — use as-is only if it looks like bullet points
+  const looksLikeBullets = /^[•\-*\[]/m.test(raw);
+  return { groups: "", flat: looksLikeBullets ? raw : "" };
 }
 
 export async function genFlow(
