@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { createReadStream } from "fs";
 
 const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID ?? "";
 const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "";
@@ -28,6 +29,30 @@ export async function uploadToR2(
       Bucket: R2_BUCKET,
       Key: key,
       Body: body,
+      ContentType: contentType,
+    }));
+    return `${R2_PUBLIC_URL}/${key}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Upload a large file to R2 by streaming it from disk instead of loading into RAM. */
+export async function uploadFileToR2(
+  key: string,
+  filePath: string,
+  fileSize: number,
+  contentType: string
+): Promise<string | null> {
+  const client = getR2Client();
+  if (!client) return null;
+  try {
+    const stream = createReadStream(filePath);
+    await client.send(new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key,
+      Body: stream,
+      ContentLength: fileSize,
       ContentType: contentType,
     }));
     return `${R2_PUBLIC_URL}/${key}`;

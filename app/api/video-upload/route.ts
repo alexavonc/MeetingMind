@@ -4,7 +4,7 @@ import { promisify } from "util";
 import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { uploadToR2, getR2Client } from "@/lib/r2";
+import { uploadFileToR2, getR2Client } from "@/lib/r2";
 
 const execAsync = promisify(exec);
 export const maxDuration = 300;
@@ -123,14 +123,14 @@ export async function POST(req: NextRequest) {
       try {
         const fileStats = await stat(videoPath);
         if (fileStats.size <= MAX_VIDEO_STORE_BYTES) {
-          const videoBuffer = await readFile(videoPath);
           const ext = originalExt.replace(/^\./, "");
           const key = `${meetingId}/video.${ext}`;
           const contentType = ext === "webm" ? "video/webm"
             : ext === "mov" ? "video/quicktime"
             : ext === "avi" ? "video/x-msvideo"
             : "video/mp4";
-          videoUrl = (await uploadToR2(key, videoBuffer, contentType)) ?? "";
+          // Stream from disk — avoids loading the entire video into RAM
+          videoUrl = (await uploadFileToR2(key, videoPath, fileStats.size, contentType)) ?? "";
         }
       } catch { /* non-critical — transcription succeeded, video storage optional */ }
     }
