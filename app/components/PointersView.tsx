@@ -57,7 +57,20 @@ export default function PointersView({ meeting, onRecoverFrames }: Props) {
     );
   }
 
-  const lines = meeting.pointers
+  const rawPointers = meeting.pointers;
+
+  // Recover from the case where the grouped JSON was accidentally stored as the flat text
+  let pointersText = rawPointers;
+  if (rawPointers.trimStart().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawPointers) as { groups?: Array<{ points: string[] }> };
+      if (Array.isArray(parsed.groups)) {
+        pointersText = parsed.groups.flatMap((g) => g.points).join("\n");
+      }
+    } catch { /* keep original */ }
+  }
+
+  const lines = pointersText
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => /^[•\-*]/.test(l) || /^\[\d+:\d+\]/.test(l));
@@ -65,7 +78,7 @@ export default function PointersView({ meeting, onRecoverFrames }: Props) {
   if (lines.length === 0) {
     return (
       <pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-        {meeting.pointers}
+        {pointersText}
       </pre>
     );
   }
