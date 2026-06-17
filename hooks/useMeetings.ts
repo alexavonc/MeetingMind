@@ -710,9 +710,37 @@ export function useMeetings() {
                   form.append("provider", settings.transcriptionProvider);
                   form.append("meetingId", meetingId);
                   form.append("fileExt", f.name.split(".").pop() ?? "mp4");
-                  setProcessing({ active: true, step: "transcribing", error: null, detail: "Extracting audio + transcribing…" });
+                  const durationMins = Math.ceil((f.size / (1024 * 1024)) / 10); // rough estimate
+                  setProcessing({
+                    active: true, step: "transcribing", error: null,
+                    detail: `Extracting audio + transcribing… (large file — may take ${durationMins}+ min)`,
+                  });
                 }
-                const res = await fetch("/api/video-upload", { method: "POST", body: form });
+                // Final chunk needs extra time for server-side FFmpeg + Groq (up to 8 min).
+                // All other chunks use the default fetch timeout.
+                const isLastChunk = i === totalChunks - 1;
+                const controller = isLastChunk ? new AbortController() : null;
+                const timeoutId = controller
+                  ? setTimeout(() => controller.abort(), 8 * 60 * 1000)
+                  : null;
+                let res: Response;
+                try {
+                  res = await fetch("/api/video-upload", {
+                    method: "POST",
+                    body: form,
+                    signal: controller?.signal,
+                  });
+                } catch (fetchErr) {
+                  if (fetchErr instanceof Error && fetchErr.name === "AbortError") {
+                    throw new Error(
+                      "Transcription timed out — the file is too large to process on the server. " +
+                      "Try splitting it into shorter segments, or switch to OpenAI Whisper in Settings."
+                    );
+                  }
+                  throw fetchErr;
+                } finally {
+                  if (timeoutId !== null) clearTimeout(timeoutId);
+                }
                 if (!res.ok) {
                   const raw = await res.text().catch(() => "");
                   let errorMsg = "Upload failed";
