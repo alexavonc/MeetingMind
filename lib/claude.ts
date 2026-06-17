@@ -47,6 +47,13 @@ async function callClaude(
   return text;
 }
 
+/** Strip markdown code fences and extract the outermost JSON object from a Claude response. */
+function extractJSON(raw: string): string {
+  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  return match ? match[0] : cleaned;
+}
+
 // ── Diarisation ──────────────────────────────────────────────────────────────
 // Long transcripts are split into ~20-min chunks so each Claude call stays
 // under 40 seconds and avoids proxy / connection timeouts entirely.
@@ -123,12 +130,8 @@ TRANSCRIPT:
 ${text}`;
 
   const raw = await callClaude(apiKey, prompt, 5000, "claude-haiku-4-5-20251001");
-  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
-  // Extract outermost JSON object in case Haiku added preamble/postamble text
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  const toParse = jsonMatch ? jsonMatch[0] : cleaned;
   try {
-    return JSON.parse(toParse) as DiariseResult;
+    return JSON.parse(extractJSON(raw)) as DiariseResult;
   } catch {
     throw new Error("Failed to parse diarisation response as JSON");
   }
@@ -241,7 +244,7 @@ ${text}`;
 
   const raw = await callClaude(apiKey, prompt, 3000);
   try {
-    return JSON.parse(raw) as SummariseResult;
+    return JSON.parse(extractJSON(raw)) as SummariseResult;
   } catch {
     throw new Error("Failed to parse summary response as JSON");
   }
@@ -295,7 +298,7 @@ ${notes}`;
   const raw = await callClaude(apiKey, prompt, 2048);
   let parsed: { summary: string; actions: Action[]; flow: unknown };
   try {
-    parsed = JSON.parse(raw) as typeof parsed;
+    parsed = JSON.parse(extractJSON(raw)) as typeof parsed;
   } catch {
     throw new Error("Failed to parse notes response as JSON");
   }
@@ -364,9 +367,7 @@ TRANSCRIPT:
 ${text}`;
 
   const raw = await callClaude(apiKey, prompt, 4000);
-  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  const toParse = jsonMatch ? jsonMatch[0] : cleaned;
+  const toParse = extractJSON(raw);
 
   try {
     const data = JSON.parse(toParse) as { groups: Array<{ title: string; timestamp?: string; points: string[] }> };
@@ -417,7 +418,7 @@ FULL TRANSCRIPT:
 ${fullTranscript}`;
 
   const raw = await callClaude(apiKey, prompt, 2048);
-  const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
+  const cleaned = extractJSON(raw);
   JSON.parse(cleaned); // validate — throws if Claude returned garbage
   return cleaned;
 }
