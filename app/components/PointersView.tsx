@@ -42,16 +42,30 @@ function activeFrameAt(
   return result;
 }
 
+/** Derive a rough wait-time string from a duration like "45 min" or "1 hr 10 min". */
+function estimatePointersTime(duration: string): string {
+  const totalMins =
+    (parseInt(duration.match(/(\d+)\s*hr/)?.[1] ?? "0") * 60) +
+    parseInt(duration.match(/(\d+)\s*min/)?.[1] ?? "0");
+  if (!totalMins) return "under a minute";
+  if (totalMins <= 20) return "under a minute";
+  if (totalMins <= 45) return "about a minute";
+  if (totalMins <= 90) return "1–2 minutes";
+  if (totalMins <= 150) return "2–3 minutes";
+  return "3–5 minutes";
+}
+
 export default function PointersView({ meeting, onRecoverFrames }: Props) {
   const [recovering, setRecovering] = useState(false);
   const [recoverResult, setRecoverResult] = useState<"found" | "none" | null>(null);
   if (!meeting.pointers) {
+    const eta = meeting.duration ? estimatePointersTime(meeting.duration) : null;
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
         <div className="w-5 h-5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
         <p className="text-sm text-muted-foreground">Pointers are being generated…</p>
         <p className="text-xs text-muted-foreground/60">
-          This tab will populate shortly — no need to wait here.
+          {eta ? `Usually takes ${eta} for a ${meeting.duration} meeting.` : "This tab will populate shortly — no need to wait here."}
         </p>
       </div>
     );

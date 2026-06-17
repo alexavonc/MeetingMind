@@ -366,7 +366,7 @@ Rules:
 TRANSCRIPT:
 ${text}`;
 
-  const raw = await callClaude(apiKey, prompt, 8000);
+  const raw = await callClaude(apiKey, prompt, 8000, "claude-haiku-4-5-20251001");
   const toParse = extractJSON(raw);
 
   // Try parsing the extracted JSON first; fall back to parsing raw directly
