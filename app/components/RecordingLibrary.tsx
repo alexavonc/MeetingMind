@@ -274,13 +274,46 @@ export default function RecordingLibrary({
   }
 
   // Meetings: when searching show all in subtree, otherwise only direct
-  const baseMeetings = search.trim()
+  const q = search.trim().toLowerCase();
+
+  /** Strip language markup so search matches plain words. */
+  function plain(s: string) {
+    return s
+      .replace(/\[zh\|([^\]]*)\][^\[]*\[\/zh\]/g, "$1")
+      .replace(/\[ms\|([^\]]*)\][^\[]*\[\/ms\]/g, "$1")
+      .replace(/\[sg\](.*?)\[\/sg\]/g, "$1");
+  }
+
+  /** Return which non-obvious field matched, or null if title/speakers matched (already visible). */
+  function matchSource(meeting: Meeting): "summary" | "action" | "pointers" | "transcript" | null {
+    if (!q) return null;
+    if (meeting.title.toLowerCase().includes(q)) return null;
+    if (Object.values(meeting.speakers).some((n) => n.toLowerCase().includes(q))) return null;
+    if (plain(meeting.summary ?? "").toLowerCase().includes(q)) return "summary";
+    if (meeting.actions?.some((a) => a.text.toLowerCase().includes(q))) return "action";
+    if (meeting.pointers?.toLowerCase().includes(q)) return "pointers";
+    if (meeting.transcript?.some((u) => plain(u.text).toLowerCase().includes(q))) return "transcript";
+    return null;
+  }
+
+  function meetingMatchesSearch(meeting: Meeting): boolean {
+    if (!q) return true;
+    if (meeting.title.toLowerCase().includes(q)) return true;
+    if (Object.values(meeting.speakers).some((n) => n.toLowerCase().includes(q))) return true;
+    if (plain(meeting.summary ?? "").toLowerCase().includes(q)) return true;
+    if (meeting.actions?.some((a) => a.text.toLowerCase().includes(q))) return true;
+    if (meeting.pointers?.toLowerCase().includes(q)) return true;
+    if (meeting.transcript?.some((u) => plain(u.text).toLowerCase().includes(q))) return true;
+    return false;
+  }
+
+  const baseMeetings = q
     ? meetings.filter(
         (m) =>
           (selectedFolder === ""
             ? true
             : m.folder === selectedFolder || m.folder.startsWith(selectedFolder + "/")) &&
-          m.title.toLowerCase().includes(search.toLowerCase())
+          meetingMatchesSearch(m)
       )
     : meetings.filter((m) => m.folder === selectedFolder);
 
@@ -538,6 +571,14 @@ export default function RecordingLibrary({
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {meeting.date} · {meeting.duration}
+                            {q && (() => {
+                              const src = matchSource(meeting);
+                              return src ? (
+                                <span className="ml-1.5 text-[10px] text-primary/60 font-medium">
+                                  · matched in {src === "action" ? "action items" : src}
+                                </span>
+                              ) : null;
+                            })()}
                           </p>
                           <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                             {meeting.languages.map((lang) => (
