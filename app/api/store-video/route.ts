@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendFile, mkdir, readFile, rm, stat } from "fs/promises";
+import { appendFile, mkdir, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { uploadToR2 } from "@/lib/r2";
+import { uploadFileToR2 } from "@/lib/r2";
 
 export const maxDuration = 300;
 
@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
 
-    const videoBuffer = await readFile(videoPath);
     const ext = fileExt.replace(/^\./, "");
     const key = `${meetingId}/video.${ext}`;
     const contentType = ext === "webm" ? "video/webm"
@@ -47,7 +46,8 @@ export async function POST(req: NextRequest) {
       : ext === "avi" ? "video/x-msvideo"
       : "video/mp4";
 
-    const url = await uploadToR2(key, videoBuffer, contentType);
+    // Stream from disk instead of loading the whole video into RAM (avoids OOM)
+    const url = await uploadFileToR2(key, videoPath, size, contentType);
     if (!url) {
       return NextResponse.json({ error: "R2 storage not configured or upload failed" }, { status: 500 });
     }
